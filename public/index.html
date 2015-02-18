@@ -1,0 +1,42 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js" type="text/javascript" charset="utf-8"></script>
+    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <title>ÉrabliPi</title>
+    <style>
+        table, th, td {
+            border: 1px solid black;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 15px;
+        }
+    </style>
+  </head>
+
+  <body>
+    <h1>ÉrabliPi</h1>
+    <table>
+      <tr>
+        <td>
+          <h2>Réservoir 1</h2>
+          <div id="chartR1"></div>
+          <p>Niveau: <span id="niveauR1"></span></p>
+        </td>
+      </tr>
+    </table>
+    <script type="text/javascript">
+      var valNiveauR1 = document.getElementById("niveauR1");
+      valNiveauR1.innerHTML = valNiveauR1.innerHTML + ' ...';
+      function update() {
+        d3.tsv("tank-levels.csv").get(function(error, rows) {
+          console.dir(rows);
+          valNiveauR1.innerHTML = rows[rows.length - 1].raw_reading;
+        });
+        setTimeout(update, 5000);
+      }
+      update();
+    </script>
+  </body>
+</html>

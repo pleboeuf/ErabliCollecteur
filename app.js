@@ -1,18 +1,21 @@
 //
 // Poll Spark Core devices for tank level readings.
 //
-// If the CSV format changes, it can be re-generated from the database:
-//
-//   # sqlite3 erablipi.sqlite3 -separator $'\t' 'select reading_date, raw_reading, gallons from tank_reading' > jauge.csv
-//
 var http = require('https');
 var fs = require('fs');
 var spark = require('spark');
 var sqlite3 = require('sqlite3').verbose();
 var db = new sqlite3.Database('erablipi.sqlite3');
+var express = require('express');
+var path = require('path');
 var variableName = "dist";
-
+var tankLevelFile = "public/tank-levels.csv";
 var accessToken = process.env.ACCESS_TOKEN;
+var app = express();
+app.use(app.router);
+app.use(express.logger());
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/', express.static(path.join(__dirname, 'index.html')));
 
 spark.login({accessToken: accessToken}).then(
   function(token){
@@ -55,11 +58,17 @@ function insertTankReading(deviceID, rawReading, gallons) {
 
 function appendTankReadingCSV(deviceID, rawReading, gallons) {
   var timestamp = new Date().getTime();
-  fs.appendFile("tank-levels.csv", ["" + timestamp, rawReading, gallons].join("\t") + "\n", function(err) {
+  fs.appendFile(tankLevelFile, ["" + timestamp, rawReading, gallons].join("\t") + "\n", function(err) {
     if (err) {
       console.log(err);
     }
   });
 }
 
+var http = require('http');
+var port = process.env.PORT || '3000';
+app.set('port', port);
+var server = http.createServer(app);
+server.listen(port);
+console.log('Server started: http://localhost:' + port);
 
