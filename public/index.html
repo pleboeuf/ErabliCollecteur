@@ -3,6 +3,7 @@
   <head>
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js" type="text/javascript" charset="utf-8"></script>
     <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src="http://dimplejs.org/dist/dimple.v2.1.2.js"></script>
     <title>ÉrabliPi</title>
     <style>
         table, th, td {
@@ -26,13 +27,24 @@
         </td>
       </tr>
     </table>
+    <div id="chartContainer"></div>
     <script type="text/javascript">
       var valNiveauR1 = document.getElementById("niveauR1");
       valNiveauR1.innerHTML = valNiveauR1.innerHTML + ' ...';
+      var svg = dimple.newSvg("#chartContainer", 590, 400);
       function update() {
         d3.tsv("tank-levels.csv").get(function(error, rows) {
           console.dir(rows);
           valNiveauR1.innerHTML = rows[rows.length - 1].raw_reading;
+          
+          var myChart = new dimple.chart(svg, rows);
+          myChart.setBounds(60, 30, 505, 305);
+          var x = myChart.addCategoryAxis("x", "reading_date");
+          x.addOrderRule("reading_date");
+          myChart.addMeasureAxis("y", "raw_reading");
+          var s = myChart.addSeries(null, dimple.plot.line);
+          myChart.draw();
+
         });
         setTimeout(update, 5000);
       }
