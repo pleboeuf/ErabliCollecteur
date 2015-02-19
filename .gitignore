@@ -2,3 +2,4 @@
 *.csv
 node_modules/
 
+run.sh
