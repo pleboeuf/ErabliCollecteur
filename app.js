@@ -1,6 +1,7 @@
 //
 // Poll Spark Core devices for tank level readings.
 //
+var Promise = require('promise');
 var http = require('https');
 var fs = require('fs');
 var spark = require('spark');
@@ -17,18 +18,17 @@ app.use(express.logger());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', express.static(path.join(__dirname, 'index.html')));
 
+var tankIds = [
+  process.env.TANK_1_DEVICE_ID,
+  process.env.TANK_2_DEVICE_ID];
+
 spark.login({accessToken: accessToken}).then(
   function(token){
     console.log('Login completed. Token: ', token);
-    
-    var tankIds = [
-      process.env.TANK_1_DEVICE_ID,
-      process.env.TANK_2_DEVICE_ID];
-
     console.log("Getting " + tankIds.length + " tank devices: " + tankIds);
-    tankIds.map(function(id) {
-      return spark.getDevice(id).then(function(dev) { return [dev]; });
-    } ).reduce(joinPromises).then(function(tanks) {
+    Promise.all(tankIds.map(function(id) {
+      return spark.getDevice(id);
+    })).then(function(tanks) {
       console.log("Got " + tanks.length + " tank devices");
       var queryDevices = function() {
         tanks.forEach(function(tank) {
@@ -75,14 +75,6 @@ function appendTankReadingCSV(deviceID, deviceName, rawReading, gallons) {
     }
   });
 }
-    
-function joinPromises(prev, cur, i, a) {
-  return prev.then(function(a) {
-    return cur.then(function(b) {
-      return a.concat(b);
-    });
-  });
-};
 
 var http = require('http');
 var port = process.env.PORT || '3000';
