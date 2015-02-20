@@ -25,6 +25,11 @@
           <div id="chartR1"></div>
           <p>Niveau: <span id="niveauR1"></span></p>
         </td>
+        <td>
+          <h2>Réservoir 2</h2>
+          <div id="chartR2"></div>
+          <p>Niveau: <span id="niveauR2"></span></p>
+        </td>
       </tr>
     </table>
     <div id="chartContainer"></div>
@@ -41,7 +46,7 @@
           myChart.setBounds(60, 30, 505, 305);
           var x = myChart.addCategoryAxis("x", "reading_date");
           x.addOrderRule("reading_date");
-          myChart.addMeasureAxis("y", "raw_reading");
+          myChart.addMeasureAxis("y", "niveau");
           var s = myChart.addSeries(null, dimple.plot.line);
           myChart.draw();
 

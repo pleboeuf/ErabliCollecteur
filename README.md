@@ -11,7 +11,9 @@ Assuming NPM is already installed:
 ## 2. Create SQLite Database
 
     sqlite3 erablipi.sqlite3 < schema.sql
-    sqlite3 erablipi.sqlite3 -header -separator $'\t' 'select reading_date, device_name, raw_reading, gallons from tank_reading' > public/tank-levels.csv
+    sqlite3 erablipi.sqlite3 -header -separator $'\t' 'select reading_date, device_name, raw_reading as niveau, gallons from tank_reading' > public/tank-levels.csv
+
+(for some reason the header is not printed until there is a row, so run first, then re-run this last line)
 
 ## 3. Configure
 
