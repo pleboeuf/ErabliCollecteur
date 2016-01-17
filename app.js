@@ -18,7 +18,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', express.static(path.join(__dirname, 'index.html')));
 app.get('/device/:id', function(req, res) {
   db.serialize(function() {
-    db.all("select * from raw_events where device_id = ?", [req.params.id], function(err, rows) {
+    var serial_no = req.query.since;
+    db.all("select * from raw_events where device_id = ? and serial_no > ?", [req.params.id, serial_no], function(err, rows) {
       if (err) {
         console.log(err);
         return res.send(500, err);
