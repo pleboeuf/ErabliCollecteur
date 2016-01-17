@@ -40,6 +40,9 @@ spark.login({
 }).then(
   function(token) {
     console.log('Login completed. Token: ', token);
+    db.each("select device_id, max(serial_no) as serial_no from raw_events group by device_id", function(err, row) {
+      console.log(row.device_id + ": " + row.serial_no);
+    });
     console.log('Connecting to event stream.');
     spark.getEventStream(false, 'mine', function(event, err) {
       try {
