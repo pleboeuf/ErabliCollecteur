@@ -40,17 +40,15 @@ spark.login({
 }).then(
   function(token) {
     console.log('Login completed. Token: ', token);
-    db.each("select device_id, max(serial_no) as serial_no from raw_events group by device_id", function(err, row) {
-      console.log(row.device_id + ": " + row.serial_no);
-    });
+    requestReplay();
     console.log('Connecting to event stream.');
+    const eventDB = eventmodule.EventDatabase(db);
     spark.getEventStream(false, 'mine', function(event, err) {
       try {
-        //console.log("Event: " + JSON.stringify(event));
         if (event.code == "ETIMEDOUT") {
           console.error(Date() + " Timeout error");
         } else {
-          eventmodule.handleEvent(event, db);
+          eventDB.handleEvent(event);
         }
       } catch (exception) {
         console.log("Exception: " + exception + "\n" + exception.stack);
@@ -62,19 +60,19 @@ spark.login({
   }
 );
 
-function update(device) {
-  // console.log("Querying " + device.name);
-  device.getVariable(variableName).then(
-    function(data) {
-      // console.log('Got result:', data);
-      var deviceID = data.coreInfo.deviceID;
-      console.log(device.name + "." + variableName + ": " + data.result + ", " + data.coreInfo.last_heard);
-      insertTankReading(deviceID, device.name, data.result, raw2gallons(data.result, deviceID));
-    },
-    function(err) {
-      console.log('An error occurred while getting attrs:', err);
-    }
-  );
+function requestReplay() {
+  db.each("select device_id, max(serial_no) as serial_no from raw_events group by device_id", function(err, row) {
+    console.log("Requesting replay on " + row.device_id);
+    spark.getDevice(row.device_id, function(err, device) {
+      device.callFunction('replay', row.serial_no + 1).then(function(err, data) {
+        if (err) {
+          console.error('Replay request failed:', err);
+        } else {
+          console.log('Replay request successful:', data);
+        }
+      });
+    });
+  });
 }
 
 var http = require('http');
