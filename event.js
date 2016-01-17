@@ -1,7 +1,11 @@
 
 exports.handleEvent = function(event) {
   published_at = new Date(event.published_at);
-  var data = JSON.parse(event.data.replace(/'/g, '"'));
+  if (event.name.lastIndexOf("spark/", 0) != -1) {
+    console.warn("Spark event: " + JSON.stringify(event));
+    return
+  }
+  var data = JSON.parse(event.data);
   exports.handleEventData(event.coreid, data.noSerie, data.eTime, published_at, event.name, data.eData);
 }
 

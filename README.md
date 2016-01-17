@@ -1,6 +1,6 @@
-# ErabliPi
+# ErabliCollector
 
-Application Node.js affichant le niveau de réservoirs d'une érablière.
+Application Node.js collectrice de données brutes.
 
 ## 1. Install node modules
 
@@ -26,3 +26,7 @@ Get your access token and device IDs from the spark IDE.
 
     ./run.sh
 
+## To run the tests:
+
+    sudo npm install -g expresso
+    expresso
