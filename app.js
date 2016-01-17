@@ -1,66 +1,87 @@
 //
-// Souscrit au événements de tout mes Devices
+// Store Spark Core devices raw events
 //
+var Promise = require('promise');
+var http = require('https');
 var spark = require('spark');
-var token = 'edd81372b36f0c454b71c121e47c38184122af73';
-var myDevices =[];
-var deviceName = "";
-var theTimePart = [];
-var theDatePart = [];
-var theMilliSecondPart;
-var nowDateTime = new Date();
+var sqlite3 = require('sqlite3').verbose();
+var db = new sqlite3.Database('erablipi.sqlite3');
+var express = require('express');
+var path = require('path');
+const eventmodule = require('./event.js');
+var accessToken = process.env.ACCESS_TOKEN;
 
-spark.on('login', function() {
-    //Get your devices events
-    spark.getEventStream(false, 'mine', function(data, err) {
-        try {
-                console.log("Event: " + JSON.stringify(data));
-                if (data.code == "ETIMEDOUT"){
-                    console.log(Date() + " Timeout error");
-                } else {
-                    spark.getDevice(data.coreid, function(err, device){ //First get the name of the device
-                        if (err != null){
-                            console.log(err);
-                        } else {
-                            deviceName = device.name;
-                            var theDateTime = data.published_at.substr(0, 23);
-                            theDatePart = (data.published_at.substr(0, 10)).split("-");
-                            theTimePart = (data.published_at.substr(11, 12)).split(":");
-                            theMilliSecondPart = theTimePart[2].split(".");
-                            // nowDateTime = new Date(theDatePart[0], theDatePart[1] - 1, theDatePart[2], theTimePart[0], theTimePart[1], theMilliSecondPart[0], theMilliSecondPart[1] );
-                            nowDateTime = new Date(theDateTime);
-                            // console.log(theDateTime + " => " + nowDateTime);
-                            // nowDateTime = new Date(nowDateTime.toString().substr(0,24) + " UTC+0000");
-                            if (isNaN(Number(data.data))){
-                                console.log(theDatePart.toLocaleString() + " - " + theTimePart + " - " + deviceName + " - " + data.name + ": " + data.data);
-                            } else {
-                                // document.getElementById("CloudData").innerHTML += theDatePart + " - " + theTimePart + " - " + deviceName + " - " + data.name + ": " + Number(data.data).toFixed(1) + "<br>";
-                                console.log(nowDateTime.toLocaleString() + " - " + deviceName + " - " + data.name + ": " + Number(data.data).toFixed(1));
-                            }
-                        }
-                    })
-            }
+var app = express();
+app.use(app.router);
+app.use(express.logger());
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/', express.static(path.join(__dirname, 'index.html')));
+app.get('/tank/:name/levels.tsv', function(req, res) {
+  // console.log('Get ' + req.params.name);
+  db.serialize(function() {
+    db.all("select reading_date, gallons from tank_reading where device_name = ? and datetime(reading_date / 1000, 'unixepoch') >= date('now','-1 day') order by reading_date desc", [req.params.name], function(err, rows) {
+      if (err) {
+        console.log(err);
+        return res.send(500, err);
+      }
+      var tsvRows = rows.map(function(row) { return [row.reading_date, row.gallons].join('\t') });
+      var tsv = ['reading_date\tgallons'].concat(tsvRows);
+      //console.log(tsv.join(', '));
+      res.setHeader("Content-Type", "text/plain");
+      res.send(tsv.join('\n'));
+    });
+  });
+});
+
+spark.login({accessToken: accessToken}).then(
+  function(token){
+    console.log('Login completed. Token: ', token);
+    console.log('Connecting to event stream.');
+    spark.getEventStream(false, 'mine', function(event, err) {
+      // TODO check err
+      try {
+          console.log("Event: " + JSON.stringify(event));
+          if (event.code == "ETIMEDOUT") {
+            console.error(Date() + " Timeout error");
+          } else {
+            eventmodule.handleEvent(event);
+          }
         }
-        catch(err) {
-            console.log("Erreur: " + err);
+        catch(exception) {
+            console.log("Exception: " + exception + "\n" + exception.stack);
         }
     });
-});
-// Login as usual
-//spark.login({ username: 'email@example.com', password: 'password'});
-spark.login({ accessToken: token });
-
-var devicesPr = spark.listDevices();
-devicesPr.then(
-  function(devices){
-    var x;
-    for (x in devices) {
-        myDevices[x] = "{" + devices[x].id + ":" + devices[x].name + "}" + ", ";
-        console.log(devices[x].id + ":" + devices[x].name);
-    }
-    // console.log(myDevices);
   },
   function(err) {
-    console.log('List devices call failed: ', err);
+    console.log('Login failed: ', err);
   }
 );
+
+function update(device) {
+  // console.log("Querying " + device.name);
+  device.getVariable(variableName).then(
+    function(data) {
+      // console.log('Got result:', data);
+      var deviceID = data.coreInfo.deviceID;
+      console.log(device.name + "." + variableName + ": " + data.result + ", " + data.coreInfo.last_heard);
+      insertTankReading(deviceID, device.name, data.result, raw2gallons(data.result, deviceID));
+    },
+    function(err) {
+      console.log('An error occurred while getting attrs:', err);
+    }
+  );
+}
+
+function insertTankReading(deviceID, deviceName, rawReading, gallons) {
+  db.serialize(function() {
+    db.run("INSERT INTO tank_reading (device_id, device_name, reading_date, raw_reading, gallons) VALUES (?, ?, ?, ?, ?)",
+        [ deviceID, deviceName, new Date(), rawReading, gallons.toFixed(0) ]);
+  });
+}
+
+var http = require('http');
+var port = process.env.PORT || '3000';
+app.set('port', port);
+var server = http.createServer(app);
+server.listen(port);
+console.log('Server started: http://localhost:' + port);

@@ -9,7 +9,8 @@
     "express": "^3.4.0",
     "promise": "^6.1.0",
     "spark": ">= 0.2.6",
-    "sqlite3": ">= 3.0"
+    "sqlite3": ">= 3.0",
+    "expresso": ""
   },
   "engines": {
     "node": ">= 0.4.7"
