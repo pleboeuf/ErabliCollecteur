@@ -5,7 +5,7 @@ var Promise = require('promise');
 var http = require('https');
 var spark = require('spark');
 var sqlite3 = require('sqlite3').verbose();
-var db = new sqlite3.Database('erablipi.sqlite3');
+var db = new sqlite3.Database('raw_events.sqlite3');
 var express = require('express');
 var path = require('path');
 const eventmodule = require('./event.js');
@@ -24,7 +24,9 @@ app.get('/tank/:name/levels.tsv', function(req, res) {
         console.log(err);
         return res.send(500, err);
       }
-      var tsvRows = rows.map(function(row) { return [row.reading_date, row.gallons].join('\t') });
+      var tsvRows = rows.map(function(row) {
+        return [row.reading_date, row.gallons].join('\t')
+      });
       var tsv = ['reading_date\tgallons'].concat(tsvRows);
       //console.log(tsv.join(', '));
       res.setHeader("Content-Type", "text/plain");
@@ -33,22 +35,23 @@ app.get('/tank/:name/levels.tsv', function(req, res) {
   });
 });
 
-spark.login({accessToken: accessToken}).then(
-  function(token){
+spark.login({
+  accessToken: accessToken
+}).then(
+  function(token) {
     console.log('Login completed. Token: ', token);
     console.log('Connecting to event stream.');
     spark.getEventStream(false, 'mine', function(event, err) {
       try {
-          //console.log("Event: " + JSON.stringify(event));
-          if (event.code == "ETIMEDOUT") {
-            console.error(Date() + " Timeout error");
-          } else {
-            eventmodule.handleEvent(event);
-          }
+        //console.log("Event: " + JSON.stringify(event));
+        if (event.code == "ETIMEDOUT") {
+          console.error(Date() + " Timeout error");
+        } else {
+          eventmodule.handleEvent(event, db);
         }
-        catch(exception) {
-            console.log("Exception: " + exception + "\n" + exception.stack);
-        }
+      } catch (exception) {
+        console.log("Exception: " + exception + "\n" + exception.stack);
+      }
     });
   },
   function(err) {
@@ -69,13 +72,6 @@ function update(device) {
       console.log('An error occurred while getting attrs:', err);
     }
   );
-}
-
-function insertTankReading(deviceID, deviceName, rawReading, gallons) {
-  db.serialize(function() {
-    db.run("INSERT INTO tank_reading (device_id, device_name, reading_date, raw_reading, gallons) VALUES (?, ?, ?, ?, ?)",
-        [ deviceID, deviceName, new Date(), rawReading, gallons.toFixed(0) ]);
-  });
 }
 
 var http = require('http');

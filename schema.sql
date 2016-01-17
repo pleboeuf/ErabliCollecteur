@@ -1,8 +1,7 @@
- CREATE TABLE Raw_Events (
-     Event_no integer,
-     device_id varchar(30),
-     Published_at timestamp,
-     eTime integer,
-     serialNo integer,
-     raw_data varchar(70)
- );
+ CREATE TABLE raw_events (
+   device_id varchar(24),
+   published_at timestamp,
+   event_name varchar(50),
+   raw_data text,
+   serial_no integer
+);

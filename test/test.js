@@ -1,6 +1,10 @@
 const assert = require('assert');
 const eventmodule = require('../event.js');
 
+var db = {
+  "serialize": function() {}
+}
+
 exports['test String#length'] = function() {
   assert.equal(6, 'foobar'.length);
 };
@@ -13,7 +17,7 @@ exports['test handleEvent#normal'] = function() {
     "coreid": "1f003f000747343337373738",
     "name": "Distance"
   };
-  eventmodule.handleEvent(event);
+  eventmodule.handleEvent(event, db);
 }
 
 exports['test handleEvent#started'] = function() {
@@ -24,7 +28,7 @@ exports['test handleEvent#started'] = function() {
     "coreid": "3a0037000c47343233323032",
     "name": "spark/flash/status"
   };
-  eventmodule.handleEvent(event);
+  eventmodule.handleEvent(event, db);
 }
 
 exports['test handleEvent#failed'] = function() {
@@ -35,7 +39,7 @@ exports['test handleEvent#failed'] = function() {
     "coreid": "3a0037000c47343233323032",
     "name": "spark/flash/status"
   };
-  eventmodule.handleEvent(event);
+  eventmodule.handleEvent(event, db);
 }
 
 exports['test handleEvent#online'] = function() {
@@ -46,5 +50,5 @@ exports['test handleEvent#online'] = function() {
     "coreid": "3a0037000c47343233323032",
     "name": "spark/status"
   };
-  eventmodule.handleEvent(event);
+  eventmodule.handleEvent(event, db);
 }
