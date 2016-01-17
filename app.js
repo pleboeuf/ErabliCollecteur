@@ -16,21 +16,23 @@ app.use(app.router);
 app.use(express.logger());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', express.static(path.join(__dirname, 'index.html')));
-app.get('/tank/:name/levels.tsv', function(req, res) {
-  // console.log('Get ' + req.params.name);
+app.get('/device/:id', function(req, res) {
   db.serialize(function() {
-    db.all("select reading_date, gallons from tank_reading where device_name = ? and datetime(reading_date / 1000, 'unixepoch') >= date('now','-1 day') order by reading_date desc", [req.params.name], function(err, rows) {
+    db.all("select * from raw_events where device_id = ?", [req.params.id], function(err, rows) {
       if (err) {
         console.log(err);
         return res.send(500, err);
       }
-      var tsvRows = rows.map(function(row) {
-        return [row.reading_date, row.gallons].join('\t')
+      var events = rows.map(function(row) {
+        return {
+          "coreid": row.device_id,
+          "published_at": row.published_at,
+          "name": "brunelle/stored",
+          "data": row.raw_data
+        };
       });
-      var tsv = ['reading_date\tgallons'].concat(tsvRows);
-      //console.log(tsv.join(', '));
       res.setHeader("Content-Type", "text/plain");
-      res.send(tsv.join('\n'));
+      res.send(JSON.stringify(events));
     });
   });
 });

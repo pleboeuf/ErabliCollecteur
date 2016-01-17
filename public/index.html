@@ -3,92 +3,12 @@
   <head>
     <meta charset="UTF-8">
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js" type="text/javascript" charset="utf-8"></script>
-    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/c3/0.4.9/c3.css" rel="stylesheet" type="text/css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/c3/0.4.9/c3.js" charset="utf-8"></script>
-    <script src="http://dimplejs.org/dist/dimple.v2.1.2.js"></script>
-    <title>ÉrabliPi</title>
-    <style>
-        table, th, td {
-            border: 1px solid black;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 15px;
-        }
-    </style>
+    <title>ErabliCollecteur</title>
   </head>
-
   <body>
-    <table>
-      <tr>
-        <td>
-          <h1><center>Tanker 1</center></h1>
-        </td>
-        <td>
-          <h1><center>Pump House 1</center></h1>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <div id='chartJR1'></div>
-          <h1><span id="niveauJR1"></span></h1>
-          <h2><span id="temperatureJR1"></span></h2>
-        </td>
-        <td>
-          <div id='chartJR2'></div>
-          <h1><span id="niveauJR2"></span></h1>
-          <h2><span id="temperatureJR2"></span></h2>
-        </td>
-      </tr>
-    </table>
-
-    <script type="text/javascript">
-      var tanks = [{name:"JR1"},
-                   {name:"JR2"}];
-
-      function update() {
-        tanks.forEach(function(tank) {
-          updateNiveau(tank);
-        });
-        setTimeout(update, 1000);
-      }
-
-      function updateNiveau(tank){
-        var valNiveau = document.getElementById("niveau" + tank.name);
-        d3.tsv("/tank/" + tank.name + "/levels.tsv").get(function(error, rows) {
-          console.dir(rows);
-          var row = rows[0];
-          valNiveau.innerHTML = row.gallons + " gal.";
-          // arcChart("#chart" + tank.name , row.gallons);
-        });
-      }
-
-      function arcChart(div, val){
-          var chart = c3.generate({
-              bindto: div,
-              data: {
-                  columns: [
-                      ['data', val]
-                  ],
-                  type: 'gauge'
-              },
-              gauge: {
-              },
-              color: {
-                  pattern: ['#60B044', '#F6C600', '#F97600', '#FF0000'],
-                  threshold: {
-                      values: [50, 70, 90, 100]
-                  }
-              },
-              size: {
-                  width: 500
-              }
-          });
-      }
-
-      update();
-
-    </script>
+    <h1>ErabliCollecteur</h1>
+    <form action="/device/3a0025000847343337373738">
+      <input type="submit"/>
+    </form>
   </body>
 </html>
