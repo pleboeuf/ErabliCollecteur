@@ -1,6 +1,7 @@
 <!DOCTYPE HTML>
 <html>
   <head>
+    <meta charset="UTF-8">
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js" type="text/javascript" charset="utf-8"></script>
     <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/c3/0.4.9/c3.css" rel="stylesheet" type="text/css">
@@ -50,7 +51,7 @@
         tanks.forEach(function(tank) {
           updateNiveau(tank);
         });
-        setTimeout(update, 5000);
+        setTimeout(update, 1000);
       }
 
       function updateNiveau(tank){
@@ -59,7 +60,7 @@
           console.dir(rows);
           var row = rows[0];
           valNiveau.innerHTML = row.gallons + " gal.";
-          arcChart("#chart" + tank.name , row.gallons);
+          // arcChart("#chart" + tank.name , row.gallons);
         });
       }
 
@@ -85,9 +86,9 @@
               }
           });
       }
-      
+
       update();
-      
+
     </script>
   </body>
 </html>
