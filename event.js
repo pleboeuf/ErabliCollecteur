@@ -1,4 +1,3 @@
-
 exports.handleEvent = function(event) {
   published_at = new Date(event.published_at);
   if (event.name.lastIndexOf("spark/", 0) != -1) {

@@ -38,9 +38,8 @@ spark.login({accessToken: accessToken}).then(
     console.log('Login completed. Token: ', token);
     console.log('Connecting to event stream.');
     spark.getEventStream(false, 'mine', function(event, err) {
-      // TODO check err
       try {
-          console.log("Event: " + JSON.stringify(event));
+          //console.log("Event: " + JSON.stringify(event));
           if (event.code == "ETIMEDOUT") {
             console.error(Date() + " Timeout error");
           } else {
