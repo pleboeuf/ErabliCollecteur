@@ -18,13 +18,13 @@ exports.EventDatabase = function(db) {
       } catch (exception) {
         console.warn("Failed to inspect event. Storing invariantly.", exception);
       }
-      this.insertEvent(event.coreid, data.noSerie, data.eTime, published_at, event.name, event.data);
+      this.insertEvent(event.coreid, data.noSerie, data.eTime, published_at, event.data);
     },
-    "insertEvent": function(device_id, serial_no, event_time, published_at, event_name, raw_data) {
-      console.log("Got: " + [device_id, serial_no, event_time, published_at, event_name, raw_data]);
-      var sql = "INSERT INTO raw_events (device_id, published_at, event_name, raw_data, serial_no) VALUES (?, ?, ?, ?, ?)";
+    "insertEvent": function(device_id, serial_no, event_time, published_at, raw_data) {
+      console.log("Got: " + [device_id, serial_no, event_time, published_at, raw_data]);
+      var sql = "INSERT INTO raw_events (device_id, published_at, raw_data, serial_no) VALUES (?, ?, ?, ?)";
       db.serialize(function() {
-        db.run(sql, [device_id, published_at, event_name, raw_data, serial_no]);
+        db.run(sql, [device_id, published_at, raw_data, serial_no]);
       });
     },
     "containsEvent": function(device_id, serial_no) {
