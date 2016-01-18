@@ -11,6 +11,9 @@ var path = require('path');
 const eventmodule = require('./event.js');
 var accessToken = process.env.ACCESS_TOKEN;
 
+const eventDB = eventmodule.EventDatabase(db);
+const CommandHandler = require('./command.js').CommandHandler(db);
+
 var app = express();
 app.use(app.router);
 app.use(express.logger());
@@ -45,8 +48,10 @@ spark.login({
     console.log('Login completed. Token: ', token);
     requestReplay();
     console.log('Connecting to event stream.');
-    const eventDB = eventmodule.EventDatabase(db);
     spark.getEventStream(false, 'mine', function(event, err) {
+      if (err) {
+        throw err;
+      }
       try {
         if (event.code == "ETIMEDOUT") {
           console.error(Date() + " Timeout error");
@@ -65,6 +70,9 @@ spark.login({
 
 function requestReplay() {
   db.each("select device_id, max(serial_no) as serial_no from raw_events group by device_id", function(err, row) {
+    if (err) {
+      throw err;
+    }
     console.log("Requesting replay on " + row.device_id);
     spark.getDevice(row.device_id, function(err, device) {
       device.callFunction('replay', row.serial_no + 1).then(function(err, data) {
@@ -82,5 +90,50 @@ var http = require('http');
 var port = process.env.PORT || '3000';
 app.set('port', port);
 var server = http.createServer(app);
+
+var WebSocketServer = require('websocket').server;
+var wsServer = new WebSocketServer({
+  httpServer: server,
+  autoAcceptConnections: false
+});
+var connectedClients = [];
+
+function originIsAllowed(origin) {
+  // put logic here to detect whether the specified origin is allowed.
+  return true;
+}
+
+wsServer.on('request', function(request) {
+  try {
+    if (!originIsAllowed(request.origin)) {
+      // Make sure we only accept requests from an allowed origin
+      request.reject();
+      console.log((new Date()) + ' Connection from origin ' + request.origin + ' rejected.');
+      return;
+    }
+    var connection = request.accept('event-stream', request.origin);
+    connectedClients.push(connection);
+    console.log((new Date()) + ' Connection accepted from ' + connection.remoteAddress + '. Connections: ' + connectedClients.length);
+    connection.on('message', function(message) {
+      if (message.type === 'utf8') {
+        console.log('Received Message: ' + message.utf8Data);
+        var command = JSON.parse(message.utf8Data);
+        CommandHandler.onCommand(command, connection);
+      }
+    });
+    connection.on('close', function(reasonCode, description) {
+      connectedClients.splice(connectedClients.indexOf(connection), 1);
+      console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected. Connections: ' + connectedClients.length);
+    });
+  } catch (exception) {
+    console.error(exception);
+  }
+});
+eventDB.onEvent(function(event) {
+  connectedClients.forEach(function(connection) {
+    connection.sendUTF(JSON.stringify(event));
+  });
+});
+
 server.listen(port);
 console.log('Server started: http://localhost:' + port);

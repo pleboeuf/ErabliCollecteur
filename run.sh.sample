@@ -1,8 +1,5 @@
 #!/bin/bash
 
 ACCESS_TOKEN="token" \
-TANK_1_DEVICE_ID="id" \
-TANK_2_DEVICE_ID="id" \
 PORT=3000 \
 node app
-

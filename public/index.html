@@ -4,12 +4,77 @@
     <meta charset="UTF-8">
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js" type="text/javascript" charset="utf-8"></script>
     <title>ErabliCollecteur</title>
+    <script language="javascript" type="text/javascript">
+      function wsUri(path) {
+        var l = window.location;
+        return ((l.protocol === "https:") ? "wss://" : "ws://") + l.hostname + (((l.port != 80) && (l.port != 443)) ? ":" + l.port : "") + l.pathname + path;
+      }
+      var eventstream;
+      var websocket;
+      function onLoad() {
+        eventstream = document.getElementById("eventstream");
+        logSystemMessage('Ready to open socket.');
+      }
+      function openSocket() {
+        websocket = new WebSocket(wsUri(""), "event-stream");
+        websocket.onopen = function(evt) {
+          logSystemMessage('Socket opened.');
+        };
+        websocket.onclose = function(evt) {
+          logSystemMessage('Socket closed.');
+        };
+        websocket.onmessage = function(evt) {
+          logHtml('<span class="eventtype">Received</span><span class="data">' + evt.data+'</span>');
+        };
+        websocket.onerror = function(evt) {
+          logSystemMessage('Error:' + evt);
+        };
+      }
+      function sendMessage() {
+        websocket.send(document.getElementById("message").value);
+      }
+      function clearStream() {
+        eventstream.innerHTML = '';
+      }
+      function closeSocket() {
+        websocket.close();
+      }
+      function logSystemMessage(message) {
+        logHtml('<span class="eventtype">System</span><span class="message">' + message + '</span>');
+      }
+      function logHtml(html) {
+        var p = document.createElement("p");
+        p.innerHTML = html;
+        eventstream.appendChild(p);
+      }
+      window.addEventListener("load", onLoad, false);
+    </script>
+    <style>
+    .eventtype {
+      padding: 0.2em;
+      margin-right: 0.2em;
+      background-color: #80B3FF;
+    }
+    .data {
+      font-family: monospace;
+    }
+    input[type="text"] {
+      width: 40em;
+    }
+    </style>
   </head>
   <body>
     <h1>ErabliCollecteur</h1>
-    <form action="/device/3a0025000847343337373738">
-      Event serial number: <input type="text" name="since"/>
-      <input type="submit"/>
+    <form>
+      <input type="button" onclick="openSocket()" value="Open"/>
+      <input type="button" onclick="closeSocket()" value="Close"/>
+      <input type="button" onclick="clearStream()" value="Clear"/>
+      <div>
+        <input type="text" id="message" value='{ "command" : "query", "device": "device-id", "after": 0 }'/>
+        <input type="button" onclick="sendMessage()" value="Send"/>
+      </div>
     </form>
+    <h2>Event Stream</h2>
+    <div id="eventstream"/>
   </body>
 </html>
