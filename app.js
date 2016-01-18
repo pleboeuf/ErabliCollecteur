@@ -88,5 +88,41 @@ var http = require('http');
 var port = process.env.PORT || '3000';
 app.set('port', port);
 var server = http.createServer(app);
+
+var WebSocketServer = require('websocket').server;
+var wsServer = new WebSocketServer({
+  httpServer: server,
+  autoAcceptConnections: false
+});
+
+function originIsAllowed(origin) {
+  // put logic here to detect whether the specified origin is allowed.
+  return true;
+}
+
+wsServer.on('request', function(request) {
+  try {
+    if (!originIsAllowed(request.origin)) {
+      // Make sure we only accept requests from an allowed origin
+      request.reject();
+      console.log((new Date()) + ' Connection from origin ' + request.origin + ' rejected.');
+      return;
+    }
+    var connection = request.accept('event-stream', request.origin);
+    console.log((new Date()) + ' Connection accepted.');
+    connection.on('message', function(message) {
+      if (message.type === 'utf8') {
+        console.log('Received Message: ' + message.utf8Data);
+        connection.sendUTF('What do you mean, ' + message.utf8Data + '?');
+      }
+    });
+    connection.on('close', function(reasonCode, description) {
+      console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected.');
+    });
+  } catch (exception) {
+    console.error(exception);
+  }
+});
+
 server.listen(port);
 console.log('Server started: http://localhost:' + port);
