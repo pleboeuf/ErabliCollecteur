@@ -10,6 +10,7 @@ var express = require('express');
 var path = require('path');
 const eventmodule = require('./event.js');
 var accessToken = process.env.ACCESS_TOKEN;
+const eventDB = eventmodule.EventDatabase(db);
 
 var app = express();
 app.use(app.router);
@@ -45,7 +46,6 @@ spark.login({
     console.log('Login completed. Token: ', token);
     requestReplay();
     console.log('Connecting to event stream.');
-    const eventDB = eventmodule.EventDatabase(db);
     spark.getEventStream(false, 'mine', function(event, err) {
       if (err) {
         throw err;
@@ -94,6 +94,7 @@ var wsServer = new WebSocketServer({
   httpServer: server,
   autoAcceptConnections: false
 });
+var connectedClients = [];
 
 function originIsAllowed(origin) {
   // put logic here to detect whether the specified origin is allowed.
@@ -109,7 +110,8 @@ wsServer.on('request', function(request) {
       return;
     }
     var connection = request.accept('event-stream', request.origin);
-    console.log((new Date()) + ' Connection accepted.');
+    connectedClients.push(connection);
+    console.log((new Date()) + ' Connection accepted from ' + connection.remoteAddress + '. Connections: ' + connectedClients.length);
     connection.on('message', function(message) {
       if (message.type === 'utf8') {
         console.log('Received Message: ' + message.utf8Data);
@@ -117,11 +119,17 @@ wsServer.on('request', function(request) {
       }
     });
     connection.on('close', function(reasonCode, description) {
-      console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected.');
+      connectedClients.splice(connectedClients.indexOf(connection), 1);
+      console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected. Connections: ' + connectedClients.length);
     });
   } catch (exception) {
     console.error(exception);
   }
+});
+eventDB.onEvent(function(event) {
+  connectedClients.forEach(function(connection) {
+    connection.sendUTF(JSON.stringify(event));
+  });
 });
 
 server.listen(port);

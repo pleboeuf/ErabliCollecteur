@@ -65,3 +65,17 @@ exports['test handleEvent#online'] = function() {
   };
   events.handleEvent(event);
 }
+
+exports['test onEvent'] = function() {
+  var event = {
+    "data": "{\"noSerie\": 7872,\"eTime\": 77465494,\"eData\": 588, \"eName\": \"BLAH/Distance\"}",
+    "ttl": "60",
+    "published_at": "2016-01-17T17:17:18.370Z",
+    "coreid": "1f003f000747343337373738",
+    "name": "brunelle/live/sonde/BLAH/Distance"
+  };
+  events.onEvent(function(evt) {
+    console.log("onEvent called: " + JSON.stringify(evt));
+  });
+  events.handleEvent(event);
+}
