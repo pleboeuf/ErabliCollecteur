@@ -10,7 +10,9 @@ var express = require('express');
 var path = require('path');
 const eventmodule = require('./event.js');
 var accessToken = process.env.ACCESS_TOKEN;
+
 const eventDB = eventmodule.EventDatabase(db);
+const CommandHandler = require('./command.js').CommandHandler(db);
 
 var app = express();
 app.use(app.router);
@@ -115,7 +117,8 @@ wsServer.on('request', function(request) {
     connection.on('message', function(message) {
       if (message.type === 'utf8') {
         console.log('Received Message: ' + message.utf8Data);
-        connection.sendUTF('What do you mean, ' + message.utf8Data + '?');
+        var command = JSON.parse(message.utf8Data);
+        CommandHandler.onCommand(command, connection);
       }
     });
     connection.on('close', function(reasonCode, description) {

@@ -33,6 +33,9 @@
       function sendMessage() {
         websocket.send(document.getElementById("message").value);
       }
+      function clearStream() {
+        eventstream.innerHTML = '';
+      }
       function closeSocket() {
         websocket.close();
       }
@@ -55,6 +58,9 @@
     .data {
       font-family: monospace;
     }
+    input[type="text"] {
+      width: 40em;
+    }
     </style>
   </head>
   <body>
@@ -62,8 +68,9 @@
     <form>
       <input type="button" onclick="openSocket()" value="Open"/>
       <input type="button" onclick="closeSocket()" value="Close"/>
+      <input type="button" onclick="clearStream()" value="Clear"/>
       <div>
-        <input type="text" id="message"/>
+        <input type="text" id="message" value='{ "command" : "query", "device": "device-id", "after": 0 }'/>
         <input type="button" onclick="sendMessage()" value="Send"/>
       </div>
     </form>
