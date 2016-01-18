@@ -47,6 +47,9 @@ spark.login({
     console.log('Connecting to event stream.');
     const eventDB = eventmodule.EventDatabase(db);
     spark.getEventStream(false, 'mine', function(event, err) {
+      if (err) {
+        throw err;
+      }
       try {
         if (event.code == "ETIMEDOUT") {
           console.error(Date() + " Timeout error");
@@ -65,6 +68,9 @@ spark.login({
 
 function requestReplay() {
   db.each("select device_id, max(serial_no) as serial_no from raw_events group by device_id", function(err, row) {
+    if (err) {
+      throw err;
+    }
     console.log("Requesting replay on " + row.device_id);
     spark.getDevice(row.device_id, function(err, device) {
       device.callFunction('replay', row.serial_no + 1).then(function(err, data) {
