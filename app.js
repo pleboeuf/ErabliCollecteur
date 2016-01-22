@@ -9,7 +9,8 @@ var db = new sqlite3.Database('raw_events.sqlite3');
 var express = require('express');
 var path = require('path');
 const eventmodule = require('./event.js');
-var accessToken = process.env.ACCESS_TOKEN;
+var config = require('./config.json');
+var accessToken = config.accessToken;
 
 const eventDB = eventmodule.EventDatabase(db);
 const CommandHandler = require('./command.js').CommandHandler(db);
@@ -87,7 +88,7 @@ function requestReplay() {
 }
 
 var http = require('http');
-var port = process.env.PORT || '3000';
+var port = config.port || '3000';
 app.set('port', port);
 var server = http.createServer(app);
 

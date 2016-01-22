@@ -2,6 +2,8 @@
 
 Application Node.js collectrice de données brutes.
 
+Au démarrage, elle se connecte au Particle Cloud et écoute les événements pour les stocker. Un serveur web permet de télécharger les événements depuis un point précis dans le passé, et de recevoir les nouveaux événements dès qu'ils arrivent.
+
 ## 1. Install node modules
 
 Assuming NPM is already installed:
@@ -12,19 +14,17 @@ Assuming NPM is already installed:
 
     sqlite3 raw_events.sqlite3 < schema.sql
 
-(for some reason the header is not printed until there is a row, so run first, then re-run this last line)
-
 ## 3. Configure
 
-    cp run.sh.sample run.sh
+    cp config.json.sample config.json
 
-Fill run.sh with your device IDs.
-
-Get your access token and device IDs from the spark IDE.
+Fill config.json with your access token from the Particle IDE.
 
 ## 3. Run!
 
-    ./run.sh
+    node app
+
+Then point your browser to http://localhost:8150/
 
 ## To run the tests:
 
