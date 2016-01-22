@@ -5,7 +5,10 @@ var db = {
     callback.call(this);
   },
   "run": function(sql, params) {
-    console.log("Running: " + sql + " " + params);
+    console.log("Running: %s %s", sql, params);
+  },
+  "get": function(sql, params, callback) {
+    console.log("Getting: %s %s", sql, params);
   },
   "all": function(sql, params, callback) {
     console.log("Query: " + sql + " [" + params + "]");
@@ -19,8 +22,9 @@ var db = {
   }
 }
 
-const EventDatabase = require('../event.js').EventDatabase(db);
+const EventDatabase = require('../event.js').EventDatabase;
 const CommandHandler = require('../command.js').CommandHandler(db);
+var database = new EventDatabase(db);
 
 exports['test String#length'] = function() {
   assert.equal(6, 'foobar'.length);
@@ -34,7 +38,7 @@ exports['test handleEvent#normal'] = function() {
     "coreid": "1f003f000747343337373738",
     "name": "brunelle/live/sonde/BLAH/Distance"
   };
-  EventDatabase.handleEvent(event, db);
+  database.handleEvent(event, db);
 }
 
 exports['test handleEvent#replay'] = function() {
@@ -45,7 +49,7 @@ exports['test handleEvent#replay'] = function() {
     "coreid": "1f003f000747343337373738",
     "name": "brunelle/replay/sonde/BLAH/Distance"
   };
-  EventDatabase.handleEvent(event, db);
+  database.handleEvent(event, db);
 }
 
 exports['test handleEvent#started'] = function() {
@@ -56,7 +60,7 @@ exports['test handleEvent#started'] = function() {
     "coreid": "3a0037000c47343233323032",
     "name": "spark/flash/status"
   };
-  EventDatabase.handleEvent(event);
+  database.handleEvent(event);
 }
 
 exports['test handleEvent#failed'] = function() {
@@ -67,7 +71,7 @@ exports['test handleEvent#failed'] = function() {
     "coreid": "3a0037000c47343233323032",
     "name": "spark/flash/status"
   };
-  EventDatabase.handleEvent(event);
+  database.handleEvent(event);
 }
 
 exports['test handleEvent#online'] = function() {
@@ -78,7 +82,7 @@ exports['test handleEvent#online'] = function() {
     "coreid": "3a0037000c47343233323032",
     "name": "spark/status"
   };
-  EventDatabase.handleEvent(event);
+  database.handleEvent(event);
 }
 
 exports['test onEvent'] = function() {
@@ -89,10 +93,10 @@ exports['test onEvent'] = function() {
     "coreid": "1f003f000747343337373738",
     "name": "brunelle/live/sonde/BLAH/Distance"
   };
-  EventDatabase.onEvent(function(evt) {
+  database.onEvent(function(evt) {
     console.log("onEvent called: " + JSON.stringify(evt));
   });
-  EventDatabase.handleEvent(event);
+  database.handleEvent(event);
 }
 
 exports.testHandleCommand = function() {
@@ -104,6 +108,7 @@ exports.testHandleCommand = function() {
   var command = {
     "command": "query",
     "device": "device-id",
+    "generation": 0,
     "after": 0
   };
   CommandHandler.onCommand(command, connection);

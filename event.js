@@ -1,45 +1,69 @@
+const Promise = require('promise');
+
 exports.EventDatabase = function(db) {
-  return {
-    "listeners": [],
-    "handleEvent": function(event) {
-      published_at = new Date(event.published_at);
-      if (event.name.lastIndexOf("spark/", 0) != -1) {
-        console.warn("Spark event: " + JSON.stringify(event));
-        return
-      }
-      var event_serial;
-      var event_time;
-      try {
-        var data = JSON.parse(event.data);
-        event_serial = data.noSerie;
-        event_time = data.eTime;
-        if (event.name.lastIndexOf("brunelle/replay/", 0) != -1) {
-          console.log("Got Replay event: " + JSON.stringify(event));
-          if (this.containsEvent(event.coreid, data.noSerie)) {
-            console.log("Ignoring duplicate event from replay: " + JSON.stringify(event));
-            return
-          }
-        }
-      } catch (exception) {
-        console.warn("Failed to inspect event. Storing invariantly: " + JSON.stringify(event), exception);
-      }
-      this.insertEvent(event.coreid, event_serial, event_time, published_at, event.data);
-      this.listeners.forEach(function(element, index, array) {
-        element.call(element, event);
-      });
-    },
-    "insertEvent": function(device_id, serial_no, event_time, published_at, raw_data) {
-      console.log("Got: " + [device_id, serial_no, event_time, published_at, raw_data]);
-      var sql = "INSERT INTO raw_events (device_id, published_at, raw_data, serial_no) VALUES (?, ?, ?, ?)";
-      db.serialize(function() {
-        db.run(sql, [device_id, published_at, raw_data, serial_no]);
-      });
-    },
-    "containsEvent": function(device_id, serial_no) {
-      return true;
-    },
-    "onEvent": function(listener) {
-      this.listeners.push(listener);
+  var self = this;
+  this.listeners = [];
+  this.handleEvent = function(event) {
+    var publishDate = new Date(event.published_at);
+    if (event.name.lastIndexOf("spark/", 0) != -1) {
+      console.warn("Spark event: " + JSON.stringify(event));
+      return
     }
-  }
+    try {
+      var data = JSON.parse(event.data);
+      self.containsEvent(event.coreid, data.eGenTS, data.noSerie).then(function(contained) {
+        if (contained) {
+          console.log("Ignoring duplicate event: " + JSON.stringify(event));
+        } else {
+          // TODO If this is a new generation ID and it is greater than zero, request a replay of that generation from zero.
+          self.insertAndNotify(event, event.coreid, data.eGenTS, data.noSerie, data.eTime, publishDate, event.data);
+        }
+      }).catch(function(err) {
+        console.error(err);
+      });
+    } catch (exception) {
+      console.warn("Failed to inspect event. Storing potentially recoverable event: " + JSON.stringify(event), exception);
+      self.insertAndNotify(event, event.coreid, undefined, undefined, undefined, publishDate, event.data);
+    }
+  };
+  this.insertAndNotify = function(event, deviceId, generationId, serialNo, eventTime, publishDate, data) {
+    self.insertEvent(event.coreid, generationId, serialNo, eventTime, publishDate, data);
+    self.listeners.forEach(function(element) {
+      element.call(element, event);
+    });
+  };
+  this.insertEvent = function(deviceId, generationId, serialNo, eventTime, publishDate, rawData) {
+    return new Promise(function(complete, reject) {
+      var sql = "INSERT INTO raw_events (device_id, published_at, generation_id, serial_no, raw_data) VALUES (?, ?, ?, ?, ?)";
+      var params = [deviceId, publishDate, generationId, serialNo, rawData];
+      console.log("Inserting: " + params);
+      db.serialize(function() {
+        db.run(sql, params, function(result) {
+          if (result == null) {
+            complete();
+          } else {
+            reject(result);
+          }
+        });
+      });
+    });
+  };
+  this.containsEvent = function(deviceId, generationId, serialNo) {
+    return new Promise(function(complete, reject) {
+      db.serialize(function() {
+        var sql = "select 1 from raw_events where device_id = ? and generation_id = ? and serial_no = ?";
+        var params = [deviceId, generationId, serialNo];
+        db.get(sql, params, function(err, row) {
+          if (err) {
+            reject(err);
+          } else {
+            complete(typeof row !== "undefined");
+          }
+        });
+      });
+    });
+  };
+  this.onEvent = function(listener) {
+    this.listeners.push(listener);
+  };
 }
