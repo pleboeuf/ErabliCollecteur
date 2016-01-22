@@ -1,5 +1,0 @@
-#!/bin/bash
-
-ACCESS_TOKEN="token" \
-PORT=3000 \
-node app
