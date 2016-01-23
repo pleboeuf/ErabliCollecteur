@@ -101,7 +101,7 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
           console.log('Replay request successful: ', data);
         } else {
           console.log('Replay request refused by %s at %s,%s with code %s. EVENTS MAY BE LOST! Waiting for events.', deviceId, generationId, serialNo, data.return_value);
-          requestReplay(deviceId, data.return_value, 0);
+          requestDeviceReplay(deviceId, data.return_value, 0);
         }
       }
     });
