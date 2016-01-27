@@ -32,7 +32,7 @@ app.get('/device/:id', function(req, res) {
         return {
           "coreid": row.device_id,
           "published_at": row.published_at,
-          "name": "brunelle/stored",
+          "name": "collector/replay",
           "data": row.raw_data
         };
       });
