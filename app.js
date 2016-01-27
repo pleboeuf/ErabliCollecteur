@@ -32,7 +32,7 @@ app.get('/device/:id', function(req, res) {
         return {
           "coreid": row.device_id,
           "published_at": row.published_at,
-          "name": "brunelle/stored",
+          "name": "collector/replay",
           "data": row.raw_data
         };
       });
@@ -80,7 +80,7 @@ function requestAllDeviceReplay() {
     } else if (typeof row.generation_id === "undefined") {
       console.error("Got undefined generation for device %s. Don't know what to request. Waiting for new events. POSSIBLE DATA LOSS!", row.device_id);
     } else {
-      requestDeviceReplay(row.device_id, row.generation_id, row.serial_no + 1);
+      requestDeviceReplay(row.device_id, row.generation_id, row.serial_no);
     }
   });
 }

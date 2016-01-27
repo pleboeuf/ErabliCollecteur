@@ -43,7 +43,7 @@ exports.CommandHandler = function(db) {
               var event = {
                 "coreid": row.device_id,
                 "published_at": row.published_at,
-                "name": "brunelle/stored",
+                "name": "collector/query",
                 "data": row.raw_data
               };
               connection.sendUTF(JSON.stringify(event));

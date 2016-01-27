@@ -11,28 +11,28 @@ exports.EventDatabase = function(db) {
     }
     try {
       var data = JSON.parse(event.data);
-      self.containsEvent(event.coreid, data.eGenTS, data.noSerie).then(function(contained) {
+      self.containsEvent(event.coreid, data.generation, data.noSerie).then(function(contained) {
         if (contained) {
           console.log("Ignoring duplicate event: " + JSON.stringify(event));
         } else {
           // TODO If this is a new generation ID and it is greater than zero, request a replay of that generation from zero.
-          self.insertAndNotify(event, event.coreid, data.eGenTS, data.noSerie, data.eTime, publishDate, event.data);
+          self.insertAndNotify(event, event.coreid, data.generation, data.noSerie, publishDate, event.data);
         }
       }).catch(function(err) {
         console.error(err);
       });
     } catch (exception) {
       console.warn("Failed to inspect event. Storing potentially recoverable event: " + JSON.stringify(event), exception);
-      self.insertAndNotify(event, event.coreid, undefined, undefined, undefined, publishDate, event.data);
+      self.insertAndNotify(event, event.coreid, undefined, undefined, publishDate, event.data);
     }
   };
-  this.insertAndNotify = function(event, deviceId, generationId, serialNo, eventTime, publishDate, data) {
-    self.insertEvent(event.coreid, generationId, serialNo, eventTime, publishDate, data);
+  this.insertAndNotify = function(event, deviceId, generationId, serialNo, publishDate, data) {
+    self.insertEvent(event.coreid, generationId, serialNo, publishDate, data);
     self.listeners.forEach(function(element) {
       element.call(element, event);
     });
   };
-  this.insertEvent = function(deviceId, generationId, serialNo, eventTime, publishDate, rawData) {
+  this.insertEvent = function(deviceId, generationId, serialNo, publishDate, rawData) {
     return new Promise(function(complete, reject) {
       var sql = "INSERT INTO raw_events (device_id, published_at, generation_id, serial_no, raw_data) VALUES (?, ?, ?, ?, ?)";
       var params = [deviceId, publishDate, generationId, serialNo, rawData];
