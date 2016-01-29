@@ -113,3 +113,7 @@ exports.testHandleCommand = function() {
   };
   CommandHandler.onCommand(command, connection);
 }
+
+// TODO Migrate to Mocha
+// TODO Actually perform assertions!
+// TODO Test sending replay request.

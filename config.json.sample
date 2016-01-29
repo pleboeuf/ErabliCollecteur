@@ -1,4 +1,5 @@
 {
   "accessToken": "place-token-here",
-  "port": 8150
+  "port": 8150,
+  "database": "raw_events.sqlite3"
 }
