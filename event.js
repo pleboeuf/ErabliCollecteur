@@ -28,8 +28,8 @@ exports.EventDatabase = function(db) {
   };
   this.insertAndNotify = function(event, deviceId, generationId, serialNo, publishDate, data) {
     self.insertEvent(event.coreid, generationId, serialNo, publishDate, data);
-    self.listeners.forEach(function(element) {
-      element.call(element, event);
+    self.listeners.forEach(function(listener) {
+      listener.call(listener, event);
     });
   };
   this.insertEvent = function(deviceId, generationId, serialNo, publishDate, rawData) {

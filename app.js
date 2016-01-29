@@ -1,75 +1,121 @@
+var fs = require('fs');
 var Promise = require('promise');
+var readFile = Promise.denodeify(fs.readFile);
 var http = require('https');
 var spark = require('spark');
 var sqlite3 = require('sqlite3').verbose();
-var db = new sqlite3.Database('raw_events.sqlite3');
 var express = require('express');
 var path = require('path');
 const eventmodule = require('./event.js');
 var config = require('./config.json');
+var dbFile = config.database || 'raw_events.sqlite3';
 var accessToken = config.accessToken;
 
-const eventDB = new eventmodule.EventDatabase(db);
-const CommandHandler = require('./command.js').CommandHandler(db);
+function startApp(db) {
+  console.log("Starting application...");
+  var eventDB = new eventmodule.EventDatabase(db);
+  var commandHandler = require('./command.js').CommandHandler(db);
+  var app = createExpressApp(db);
+  connectToParticleCloud(db, eventDB);
+  var server = createHttpServer();
+  createWebSocketServer(server, eventDB, commandHandler);
+  server.listen(port);
+  console.log('Server started: http://localhost:' + port);
+}
 
-var app = express();
-app.use(app.router);
-app.use(express.logger());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/', express.static(path.join(__dirname, 'index.html')));
-app.get('/device/:id', function(req, res) {
-  db.serialize(function() {
-    var generationId = req.query.generation;
-    var serialNo = req.query.since;
-    var sql = "select * from raw_events where device_id = ? and generation_id = ? and serial_no > ?";
-    var params = [req.params.id, generationId, serialNo];
-    db.all(sql, params, function(err, rows) {
+function ensureDatabase() {
+  return new Promise(function(resolve, reject) {
+    fs.open(dbFile, 'r', function(err, fd) {
       if (err) {
-        console.log(err);
-        return res.send(500, err);
+        console.log("Creating database:", dbFile);
+        readFile('schema.sql', 'utf8').then(createDatabase).then(resolve, reject);
+      } else {
+        console.log("Using existing database:", dbFile);
+        resolve(new sqlite3.Database(dbFile, sqlite3.OPEN_READWRITE));
       }
-      var events = rows.map(function(row) {
-        return {
-          "coreid": row.device_id,
-          "published_at": row.published_at,
-          "name": "collector/replay",
-          "data": row.raw_data
-        };
-      });
-      res.setHeader("Content-Type", "text/plain");
-      res.send(JSON.stringify(events));
     });
   });
-});
+}
 
-spark.login({
-  accessToken: accessToken
-}).then(
-  function(token) {
-    console.log('Login completed. Token: ', token);
-    requestAllDeviceReplay();
-    console.log('Connecting to event stream.');
-    spark.getEventStream(false, 'mine', function(event, err) {
-      if (err) {
-        throw err;
-      }
-      try {
-        if (event.code == "ETIMEDOUT") {
-          console.error(Date() + " Timeout error");
+function createDatabase(schema) {
+  return new Promise(function(resolve, reject) {
+    var db = new sqlite3.Database(dbFile);
+    db.serialize(function() {
+      db.run(schema, function(err) {
+        if (err != null) {
+          reject(err);
         } else {
-          eventDB.handleEvent(event);
+          resolve(db);
         }
-      } catch (exception) {
-        console.error("Exception: " + exception + "\n" + exception.stack);
-      }
+      });
     });
-  },
-  function(err) {
-    console.log('Login failed: ', err);
-  }
-);
+  });
+}
 
-function requestAllDeviceReplay() {
+function createExpressApp() {
+  var app = express();
+  app.use(app.router);
+  app.use(express.logger());
+  app.use(express.static(path.join(__dirname, 'public')));
+  app.use('/', express.static(path.join(__dirname, 'index.html')));
+  app.get('/device/:id', function(req, res) {
+    db.serialize(function() {
+      var generationId = req.query.generation;
+      var serialNo = req.query.since;
+      var sql = "select * from raw_events where device_id = ? and generation_id = ? and serial_no > ?";
+      var params = [req.params.id, generationId, serialNo];
+      db.all(sql, params, function(err, rows) {
+        if (err) {
+          console.log(err);
+          return res.send(500, err);
+        }
+        var events = rows.map(function(row) {
+          return {
+            "coreid": row.device_id,
+            "published_at": row.published_at,
+            "name": "collector/replay",
+            "data": row.raw_data
+          };
+        });
+        res.setHeader("Content-Type", "text/plain");
+        res.send(JSON.stringify(events));
+      });
+    });
+  });
+  return app;
+}
+
+function connectToParticleCloud(db, eventDB) {
+  spark.login({
+    accessToken: accessToken
+  }).then(
+    function(token) {
+      console.log('Login completed. Token: ', token);
+      requestAllDeviceReplay(db);
+      console.log('Connecting to event stream.');
+      spark.getEventStream(false, 'mine', function(event, err) {
+        if (err) {
+          throw err;
+        }
+        try {
+          if (event.code == "ETIMEDOUT") {
+            console.error(Date() + " Timeout error");
+          } else {
+            eventDB.handleEvent(event);
+          }
+        } catch (exception) {
+          console.error("Exception: " + exception + "\n" + exception.stack);
+          connectToParticleCloud();
+        }
+      });
+    },
+    function(err) {
+      console.log('Login failed: ', err);
+    }
+  );
+}
+
+function requestAllDeviceReplay(db) {
   var sql = "select raw_events.device_id as device_id, raw_events.generation_id as generation_id, max(raw_events.serial_no) as serial_no from raw_events, (select device_id, max(generation_id) as generation_id from raw_events) as gens where raw_events.device_id = gens.device_id and raw_events.generation_id = gens.generation_id";
   db.each(sql, function(err, row) {
     if (err) {
@@ -107,54 +153,56 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
   });
 }
 
-var http = require('http');
-var port = config.port || '3000';
-app.set('port', port);
-var server = http.createServer(app);
-
-var WebSocketServer = require('websocket').server;
-var wsServer = new WebSocketServer({
-  httpServer: server,
-  autoAcceptConnections: false
-});
-var connectedClients = [];
-
-function originIsAllowed(origin) {
-  // put logic here to detect whether the specified origin is allowed.
-  return true;
+function createHttpServer(app) {
+  var port = config.port || '3000';
+  app.set('port', port);
+  return http.createServer(app);
 }
 
-wsServer.on('request', function(request) {
-  try {
-    if (!originIsAllowed(request.origin)) {
-      // Make sure we only accept requests from an allowed origin
-      request.reject();
-      console.log((new Date()) + ' Connection from origin ' + request.origin + ' rejected.');
-      return;
-    }
-    var connection = request.accept('event-stream', request.origin);
-    connectedClients.push(connection);
-    console.log((new Date()) + ' Connection accepted from ' + connection.remoteAddress + '. Connections: ' + connectedClients.length);
-    connection.on('message', function(message) {
-      if (message.type === 'utf8') {
-        console.log('Received Message: ' + message.utf8Data);
-        var command = JSON.parse(message.utf8Data);
-        CommandHandler.onCommand(command, connection);
-      }
-    });
-    connection.on('close', function(reasonCode, description) {
-      connectedClients.splice(connectedClients.indexOf(connection), 1);
-      console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected. Connections: ' + connectedClients.length);
-    });
-  } catch (exception) {
-    console.error(exception);
-  }
-});
-eventDB.onEvent(function(event) {
-  connectedClients.forEach(function(connection) {
-    connection.sendUTF(JSON.stringify(event));
+function createWebSocketServer(server, eventDB, commandHandler) {
+  var WebSocketServer = require('websocket').server;
+  var wsServer = new WebSocketServer({
+    httpServer: server,
+    autoAcceptConnections: false
   });
-});
+  var connectedClients = [];
 
-server.listen(port);
-console.log('Server started: http://localhost:' + port);
+  function originIsAllowed(origin) {
+    // put logic here to detect whether the specified origin is allowed.
+    return true;
+  }
+
+  wsServer.on('request', function(request) {
+    try {
+      if (!originIsAllowed(request.origin)) {
+        // Make sure we only accept requests from an allowed origin
+        request.reject();
+        console.log((new Date()) + ' Connection from origin ' + request.origin + ' rejected.');
+        return;
+      }
+      var connection = request.accept('event-stream', request.origin);
+      connectedClients.push(connection);
+      console.log((new Date()) + ' Connection accepted from ' + connection.remoteAddress + '. Connections: ' + connectedClients.length);
+      connection.on('message', function(message) {
+        if (message.type === 'utf8') {
+          console.log('Received Message: ' + message.utf8Data);
+          var command = JSON.parse(message.utf8Data);
+          commandHandler.onCommand(command, connection);
+        }
+      });
+      connection.on('close', function(reasonCode, description) {
+        connectedClients.splice(connectedClients.indexOf(connection), 1);
+        console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected. Connections: ' + connectedClients.length);
+      });
+    } catch (exception) {
+      console.error(exception);
+    }
+  });
+  eventDB.onEvent(function(event) {
+    connectedClients.forEach(function(connection) {
+      connection.sendUTF(JSON.stringify(event));
+    });
+  });
+}
+
+ensureDatabase().then(startApp);
