@@ -1,7 +1,7 @@
 var fs = require('fs');
 var Promise = require('promise');
 var readFile = Promise.denodeify(fs.readFile);
-var http = require('https');
+var http = require('http');
 var spark = require('spark');
 var sqlite3 = require('sqlite3').verbose();
 var express = require('express');
@@ -17,10 +17,17 @@ function startApp(db) {
   var commandHandler = require('./command.js').CommandHandler(db);
   var app = createExpressApp(db);
   connectToParticleCloud(db, eventDB);
-  var server = createHttpServer();
-  createWebSocketServer(server, eventDB, commandHandler);
-  server.listen(port);
-  console.log('Server started: http://localhost:' + port);
+  try {
+    var port = config.port || '3000';
+    app.set('port', port);
+    var server = http.createServer(app);
+    createWebSocketServer(server, eventDB, commandHandler);
+    server.listen(port);
+    console.log('Server started: http://localhost:' + port);
+  } catch (err) {
+    console.error(err);
+    throw err;
+  }
 }
 
 function ensureDatabase() {
@@ -153,12 +160,6 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
   });
 }
 
-function createHttpServer(app) {
-  var port = config.port || '3000';
-  app.set('port', port);
-  return http.createServer(app);
-}
-
 function createWebSocketServer(server, eventDB, commandHandler) {
   var WebSocketServer = require('websocket').server;
   var wsServer = new WebSocketServer({
@@ -205,4 +206,6 @@ function createWebSocketServer(server, eventDB, commandHandler) {
   });
 }
 
-ensureDatabase().then(startApp);
+ensureDatabase().then(startApp).catch(function(err) {
+  console.error(err);
+});
