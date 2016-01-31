@@ -148,7 +148,7 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
       //  -2  A replay is already in progress
       // -99  Invalid generation ID
       if (err) {
-        console.error("Replay request failed: '%s' on %s at %s,%s with code %s. EVENTS MAY BE LOST! Ensure the device is online, then restart the collector to request a new replay.", err, deviceId, generationId, serialNo, data.return_value);
+        console.error("Replay request failed: '%s' on %s at %s,%s with %s. EVENTS MAY BE LOST! Ensure the device is online, then restart the collector to request a new replay.", err, deviceId, generationId, serialNo, data);
       } else {
         if (data.return_value == 0) {
           console.log('Replay request successful: ', data);
