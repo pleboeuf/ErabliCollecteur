@@ -1,7 +1,7 @@
 var fs = require('fs');
 var Promise = require('promise');
 var readFile = Promise.denodeify(fs.readFile);
-var http = require('https');
+var http = require('http');
 var spark = require('spark');
 var sqlite3 = require('sqlite3').verbose();
 var express = require('express');
@@ -17,10 +17,17 @@ function startApp(db) {
   var commandHandler = require('./command.js').CommandHandler(db);
   var app = createExpressApp(db);
   connectToParticleCloud(db, eventDB);
-  var server = createHttpServer();
-  createWebSocketServer(server, eventDB, commandHandler);
-  server.listen(port);
-  console.log('Server started: http://localhost:' + port);
+  try {
+    var port = config.port || '3000';
+    app.set('port', port);
+    var server = http.createServer(app);
+    createWebSocketServer(server, eventDB, commandHandler);
+    server.listen(port);
+    console.log('Server started: http://localhost:' + port);
+  } catch (err) {
+    console.error(err);
+    throw err;
+  }
 }
 
 function ensureDatabase() {
@@ -116,7 +123,7 @@ function connectToParticleCloud(db, eventDB) {
 }
 
 function requestAllDeviceReplay(db) {
-  var sql = "select raw_events.device_id as device_id, raw_events.generation_id as generation_id, max(raw_events.serial_no) as serial_no from raw_events, (select device_id, max(generation_id) as generation_id from raw_events) as gens where raw_events.device_id = gens.device_id and raw_events.generation_id = gens.generation_id";
+  var sql = "select raw_events.device_id as device_id, raw_events.generation_id as generation_id, max(raw_events.serial_no) as serial_no from raw_events, (select device_id, max(generation_id) as generation_id from raw_events group by device_id) as gens where raw_events.device_id = gens.device_id and raw_events.generation_id = gens.generation_id group by raw_events.device_id";
   db.each(sql, function(err, row) {
     if (err) {
       throw err;
@@ -141,7 +148,7 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
       //  -2  A replay is already in progress
       // -99  Invalid generation ID
       if (err) {
-        console.error("Replay request failed: '%s' on %s at %s,%s with code %s. EVENTS MAY BE LOST! Ensure the device is online, then restart the collector to request a new replay.", err, deviceId, generationId, serialNo, data.return_value);
+        console.error("Replay request failed: '%s' on %s at %s,%s with %s. EVENTS MAY BE LOST! Ensure the device is online, then restart the collector to request a new replay.", err, deviceId, generationId, serialNo, data);
       } else {
         if (data.return_value == 0) {
           console.log('Replay request successful: ', data);
@@ -151,12 +158,6 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
       }
     });
   });
-}
-
-function createHttpServer(app) {
-  var port = config.port || '3000';
-  app.set('port', port);
-  return http.createServer(app);
 }
 
 function createWebSocketServer(server, eventDB, commandHandler) {
@@ -205,4 +206,6 @@ function createWebSocketServer(server, eventDB, commandHandler) {
   });
 }
 
-ensureDatabase().then(startApp);
+ensureDatabase().then(startApp).catch(function(err) {
+  console.error(err);
+});
