@@ -123,7 +123,7 @@ function connectToParticleCloud(db, eventDB) {
 }
 
 function requestAllDeviceReplay(db) {
-  var sql = "select raw_events.device_id as device_id, raw_events.generation_id as generation_id, max(raw_events.serial_no) as serial_no from raw_events, (select device_id, max(generation_id) as generation_id from raw_events) as gens where raw_events.device_id = gens.device_id and raw_events.generation_id = gens.generation_id";
+  var sql = "select raw_events.device_id as device_id, raw_events.generation_id as generation_id, max(raw_events.serial_no) as serial_no from raw_events, (select device_id, max(generation_id) as generation_id from raw_events group by device_id) as gens where raw_events.device_id = gens.device_id and raw_events.generation_id = gens.generation_id group by raw_events.device_id";
   db.each(sql, function(err, row) {
     if (err) {
       throw err;
