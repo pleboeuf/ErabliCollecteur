@@ -6,6 +6,8 @@ var spark = require('spark');
 var sqlite3 = require('sqlite3').verbose();
 var express = require('express');
 var path = require('path');
+var chalk = require('chalk');
+
 const eventmodule = require('./event.js');
 var config = require('./config.json');
 var dbFile = config.database || 'raw_events.sqlite3';
@@ -17,7 +19,7 @@ function devString(deviceId) {
 }
 
 function startApp(db) {
-  console.log("Starting application...");
+  console.log(chalk.gray("Starting application..."));
   eventDB = new eventmodule.EventDatabase(db);
   var commandHandler = require('./command.js').CommandHandler(db);
   var app = createExpressApp(db);
@@ -28,7 +30,7 @@ function startApp(db) {
     var server = http.createServer(app);
     createWebSocketServer(server, eventDB, commandHandler);
     server.listen(port);
-    console.log('Server started: http://localhost:' + port);
+    console.log(chalk.green('Server started: http://localhost:%s'), port);
   } catch (err) {
     console.error(err);
     throw err;
@@ -39,10 +41,10 @@ function ensureDatabase() {
   return new Promise(function(resolve, reject) {
     fs.open(dbFile, 'r', function(err, fd) {
       if (err) {
-        console.log("Creating database:", dbFile);
+        console.log(chalk.gray("Creating database: %s"), dbFile);
         readFile('schema.sql', 'utf8').then(createDatabase).then(resolve, reject);
       } else {
-        console.log("Using existing database:", dbFile);
+        console.log(chalk.gray("Using existing database: %s"), dbFile);
         resolve(new sqlite3.Database(dbFile, sqlite3.OPEN_READWRITE));
       }
     });
@@ -78,7 +80,7 @@ function createExpressApp() {
       var params = [req.params.id, generationId, serialNo];
       db.all(sql, params, function(err, rows) {
         if (err) {
-          console.log(err);
+          console.log(chalk.red(err));
           return res.send(500, err);
         }
         var events = rows.map(function(row) {
@@ -102,39 +104,39 @@ function connectToParticleCloud(db, eventDB) {
     accessToken: accessToken
   }).then(
     function(token) {
-      console.log('Login to cloud completed. Listing devices...');
+      console.log(chalk.gray('Login to cloud completed. Listing devices...'));
       spark.listDevices().then(
         function(devices) {
-          console.log('Got %s devices from cloud.', devices.length);
+          console.log(chalk.gray('Got %s devices from cloud.'), devices.length);
           devices.forEach(function(dev)  {
             eventDB.setAttributes(dev.id, dev);
           });
           requestAllDeviceReplay(db);
-          console.log('Connecting to event stream.');
+          console.log(chalk.gray('Connecting to event stream.'));
           spark.getEventStream(false, 'mine', function(event, err) {
             if (err) {
               throw err;
             }
             try {
               if (event.code == "ETIMEDOUT") {
-                console.error(Date() + " Timeout error");
+                console.error(chalk.red(Date() + " Timeout error"));
               } else {
                 eventDB.handleEvent(event);
               }
             } catch (exception) {
-              console.error("Exception: " + exception + "\n" + exception.stack);
+              console.error(chalk.red("Exception: " + exception + "\n" + exception.stack));
               connectToParticleCloud();
             }
           });
         },
         function(err) {
-          console.log('List devices call failed: ', err);
+          console.log(chalk.red('List devices call failed: %s'), err);
           connectToParticleCloud();
         }
       );
     },
     function(err) {
-      console.log('Login failed: ', err);
+      console.log(chalk.red('Login failed: %s'), err);
     }
   );
 }
@@ -146,9 +148,9 @@ function requestAllDeviceReplay(db) {
       throw err;
     } else if (row.device_id == null) {
       // Ignoring empty row returned by sqlite aggregate function on empty result.
-      console.log("No devices to request a replay from.");
+      console.log(chalk.gray("No devices to request a replay from."));
     } else if (typeof row.generation_id === "undefined") {
-      console.error("Got undefined generation for device %s. Don't know what to request. Waiting for new events. POSSIBLE DATA LOSS!", row.device_id);
+      console.error(chalk.red("Got undefined generation for device %s. Don't know what to request. Waiting for new events. POSSIBLE DATA LOSS!"), row.device_id);
     } else {
       requestDeviceReplay(row.device_id, row.generation_id, row.serial_no);
     }
@@ -156,7 +158,7 @@ function requestAllDeviceReplay(db) {
 }
 
 function requestDeviceReplay(deviceId, generationId, serialNo) {
-  console.log("Requesting replay on %s at %s,%s", devString(deviceId), generationId, serialNo);
+  console.log(chalk.gray("Requesting replay on %s at %s,%s"), devString(deviceId), generationId, serialNo);
   spark.getDevice(deviceId, function(err, device) {
     device.callFunction('replay', "" + serialNo + ", " + generationId, function(err, data) {
       // Return codes:
@@ -165,12 +167,12 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
       //  -2  A replay is already in progress
       // -99  Invalid generation ID
       if (err) {
-        console.error("Replay request failed: '%s' on %s at %s,%s with data: %s. EVENTS MAY BE LOST! Ensure the device is online, then restart the collector to request a new replay.", err, devString(deviceId), generationId, serialNo, data);
+        console.error(chalk.red("Replay request failed: '%s' on %s at %s,%s with data: %s. EVENTS MAY BE LOST! Ensure the device is online, then restart the collector to request a new replay."), err, devString(deviceId), generationId, serialNo, data);
       } else {
         if (data.return_value == 0) {
-          console.log('Replay request on %s successful.', devString(deviceId));
+          console.log(chalk.green('Replay request on %s successful.'), devString(deviceId));
         } else {
-          console.log('Replay request refused by %s at %s,%s with code %s. EVENTS MAY BE LOST! Waiting for events.', devString(deviceId), generationId, serialNo, data.return_value);
+          console.log(chalk.yellow('Replay request refused by %s at %s,%s with code %s. EVENTS MAY BE LOST! Waiting for events.'), devString(deviceId), generationId, serialNo, data.return_value);
         }
       }
     });
@@ -195,25 +197,25 @@ function createWebSocketServer(server, eventDB, commandHandler) {
       if (!originIsAllowed(request.origin)) {
         // Make sure we only accept requests from an allowed origin
         request.reject();
-        console.log((new Date()) + ' Connection from origin ' + request.origin + ' rejected.');
+        console.log(chalk.yellow((new Date()) + ' Connection from origin ' + request.origin + ' rejected.'));
         return;
       }
       var connection = request.accept('event-stream', request.origin);
       connectedClients.push(connection);
-      console.log((new Date()) + ' Connection accepted from ' + connection.remoteAddress + '. Connections: ' + connectedClients.length);
+      console.log(chalk.gray((new Date()) + ' Connection accepted from ' + connection.remoteAddress + '. Connections: ' + connectedClients.length));
       connection.on('message', function(message) {
         if (message.type === 'utf8') {
-          console.log('Received Message: ' + message.utf8Data);
+          console.log(chalk.gray('Received Message: %s'), message.utf8Data);
           var command = JSON.parse(message.utf8Data);
           commandHandler.onCommand(command, connection);
         }
       });
       connection.on('close', function(reasonCode, description) {
         connectedClients.splice(connectedClients.indexOf(connection), 1);
-        console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected. Connections: ' + connectedClients.length);
+        console.log(chalk.gray((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected. Connections: ' + connectedClients.length));
       });
     } catch (exception) {
-      console.error(exception);
+      console.error(chalk.red(exception));
     }
   });
   eventDB.onEvent(function(event) {
@@ -224,5 +226,5 @@ function createWebSocketServer(server, eventDB, commandHandler) {
 }
 
 ensureDatabase().then(startApp).catch(function(err) {
-  console.error(err);
+  console.error(chalk.red(err));
 });
