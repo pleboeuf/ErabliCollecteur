@@ -10,10 +10,15 @@ const eventmodule = require('./event.js');
 var config = require('./config.json');
 var dbFile = config.database || 'raw_events.sqlite3';
 var accessToken = config.accessToken;
+var eventDB;
+
+function devString(deviceId) {
+  return eventDB.devString(deviceId);
+}
 
 function startApp(db) {
   console.log("Starting application...");
-  var eventDB = new eventmodule.EventDatabase(db);
+  eventDB = new eventmodule.EventDatabase(db);
   var commandHandler = require('./command.js').CommandHandler(db);
   var app = createExpressApp(db);
   connectToParticleCloud(db, eventDB);
@@ -97,24 +102,36 @@ function connectToParticleCloud(db, eventDB) {
     accessToken: accessToken
   }).then(
     function(token) {
-      console.log('Login completed. Token: ', token);
-      requestAllDeviceReplay(db);
-      console.log('Connecting to event stream.');
-      spark.getEventStream(false, 'mine', function(event, err) {
-        if (err) {
-          throw err;
-        }
-        try {
-          if (event.code == "ETIMEDOUT") {
-            console.error(Date() + " Timeout error");
-          } else {
-            eventDB.handleEvent(event);
-          }
-        } catch (exception) {
-          console.error("Exception: " + exception + "\n" + exception.stack);
+      console.log('Login to cloud completed. Listing devices...');
+      spark.listDevices().then(
+        function(devices) {
+          console.log('Got %s devices from cloud.', devices.length);
+          devices.forEach(function(dev)  {
+            eventDB.setAttributes(dev.id, dev);
+          });
+          requestAllDeviceReplay(db);
+          console.log('Connecting to event stream.');
+          spark.getEventStream(false, 'mine', function(event, err) {
+            if (err) {
+              throw err;
+            }
+            try {
+              if (event.code == "ETIMEDOUT") {
+                console.error(Date() + " Timeout error");
+              } else {
+                eventDB.handleEvent(event);
+              }
+            } catch (exception) {
+              console.error("Exception: " + exception + "\n" + exception.stack);
+              connectToParticleCloud();
+            }
+          });
+        },
+        function(err) {
+          console.log('List devices call failed: ', err);
           connectToParticleCloud();
         }
-      });
+      );
     },
     function(err) {
       console.log('Login failed: ', err);
@@ -139,7 +156,7 @@ function requestAllDeviceReplay(db) {
 }
 
 function requestDeviceReplay(deviceId, generationId, serialNo) {
-  console.log("Requesting replay on %s at %s,%s", deviceId, generationId, serialNo);
+  console.log("Requesting replay on %s at %s,%s", devString(deviceId), generationId, serialNo);
   spark.getDevice(deviceId, function(err, device) {
     device.callFunction('replay', "" + serialNo + ", " + generationId, function(err, data) {
       // Return codes:
@@ -148,12 +165,12 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
       //  -2  A replay is already in progress
       // -99  Invalid generation ID
       if (err) {
-        console.error("Replay request failed: '%s' on %s at %s,%s with %s. EVENTS MAY BE LOST! Ensure the device is online, then restart the collector to request a new replay.", err, deviceId, generationId, serialNo, data);
+        console.error("Replay request failed: '%s' on %s at %s,%s with data: %s. EVENTS MAY BE LOST! Ensure the device is online, then restart the collector to request a new replay.", err, devString(deviceId), generationId, serialNo, data);
       } else {
         if (data.return_value == 0) {
-          console.log('Replay request successful: ', data);
+          console.log('Replay request on %s successful.', devString(deviceId));
         } else {
-          console.log('Replay request refused by %s at %s,%s with code %s. EVENTS MAY BE LOST! Waiting for events.', deviceId, generationId, serialNo, data.return_value);
+          console.log('Replay request refused by %s at %s,%s with code %s. EVENTS MAY BE LOST! Waiting for events.', devString(deviceId), generationId, serialNo, data.return_value);
         }
       }
     });
