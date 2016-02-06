@@ -6,6 +6,7 @@
     "start": "node app.js"
   },
   "dependencies": {
+    "chalk": "",
     "express": "^3.4.0",
     "promise": "^6.1.0",
     "spark": ">= 0.2.6",
