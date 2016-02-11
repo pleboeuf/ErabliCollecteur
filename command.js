@@ -42,7 +42,7 @@ exports.CommandHandler = function(db) {
             rows.forEach(function(row) {
               var event = {
                 "coreid": row.device_id,
-                "published_at": row.published_at,
+                "published_at": new Date(row.published_at),
                 "name": "collector/query",
                 "data": row.raw_data
               };
