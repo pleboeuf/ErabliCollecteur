@@ -108,12 +108,11 @@ function connectToParticleCloud(db, eventDB) {
       spark.listDevices().then(
         function(devices) {
           console.log(chalk.gray('Got %s devices from cloud.'), devices.length);
-          devices.forEach(function(dev)  {
+          devices.forEach(function(dev)  {
             eventDB.setAttributes(dev.id, dev);
           });
           requestAllDeviceReplay(db);
-          console.log(chalk.gray('Connecting to event stream.'));
-          openStream();
+          openStream(eventDB);
         },
         function(err) {
           console.log(chalk.red('List devices call failed: %s'), err);

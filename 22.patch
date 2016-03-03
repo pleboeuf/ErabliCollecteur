@@ -1,0 +1,164 @@
+From ee9e893b3f233fd7eab04135dd297d95bb94268d Mon Sep 17 00:00:00 2001
+From: Nicolas Marchildon <nicolas@marchildon.net>
+Date: Thu, 11 Feb 2016 18:39:01 -0500
+Subject: [PATCH 1/4] Fix format of published date when replaying.
+
+---
+ command.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/command.js b/command.js
+index a3e514e..cb7a69a 100644
+--- a/command.js
++++ b/command.js
+@@ -42,7 +42,7 @@ exports.CommandHandler = function(db) {
+             rows.forEach(function(row) {
+               var event = {
+                 "coreid": row.device_id,
+-                "published_at": row.published_at,
++                "published_at": new Date(row.published_at),
+                 "name": "collector/query",
+                 "data": row.raw_data
+               };
+
+From a8d22e3405a622852ba755fb865871f03054c8f2 Mon Sep 17 00:00:00 2001
+From: Nicolas Marchildon <nicolas@marchildon.net>
+Date: Thu, 11 Feb 2016 18:39:30 -0500
+Subject: [PATCH 2/4] Log yellow warning when getting duplicate event that is
+ not a replay.
+
+---
+ event.js | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/event.js b/event.js
+index b159aec..ba48946 100644
+--- a/event.js
++++ b/event.js
+@@ -1,3 +1,4 @@
++const chalk = require('chalk');
+ const Promise = require('promise');
+
+ exports.EventDatabase = function(db) {
+@@ -22,7 +23,11 @@ exports.EventDatabase = function(db) {
+       var data = JSON.parse(event.data);
+       self.containsEvent(event.coreid, data.generation, data.noSerie).then(function(contained) {
+         if (contained) {
+-          console.log("Duplicate event: %s at %s,%s %s", self.devString(event.coreid), data.generation, data.noSerie, event.data);
++          if (data.replay == 0) {
++            console.log(chalk.yellow("Dropped duplicate with non-replay attribute: %s at %s,%s %s (POSSIBLE DATA LOSS)"), self.devString(event.coreid), data.generation, data.noSerie, event.data);
++          } else {
++            console.log(chalk.gray("Ignored duplicate: %s at %s,%s %s"), self.devString(event.coreid), data.generation, data.noSerie, event.data);
++          }
+         } else {
+           // TODO If this is a new generation ID and it is greater than zero, request a replay of that generation from zero.
+           self.insertAndNotify(event, event.coreid, data.generation, data.noSerie, publishDate, event.data);
+
+From 4fde5ae51187896e071fe694650f20a4c8f5ddc5 Mon Sep 17 00:00:00 2001
+From: Nicolas Marchildon <nicolas@marchildon.net>
+Date: Thu, 11 Feb 2016 18:48:35 -0500
+Subject: [PATCH 3/4] Replay: Send indexed generation & serial numbers, not raw
+ data.
+
+To allow "fixing" a bad generation, we can manually update a bad generation
+number or their serial numbers in the collector's database. The update only
+applies to the generation_id and serial_no columns, not the raw_data which
+stays unmodified. Therefore, to have any effect, we send the identifiers
+found in the two columns, not the raw data.
+
+This is really a hack for badly-behaving devices. We should really have a
+generic tool to re-write the collector's database.
+---
+ command.js | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/command.js b/command.js
+index cb7a69a..3f47334 100644
+--- a/command.js
++++ b/command.js
+@@ -40,11 +40,14 @@ exports.CommandHandler = function(db) {
+               return;
+             }
+             rows.forEach(function(row) {
++              var data = JSON.parse(row.raw_data);
++              data.generation = row.generation_id;
++              data.noSerie = row.serial_no;
+               var event = {
+                 "coreid": row.device_id,
+                 "published_at": new Date(row.published_at),
+                 "name": "collector/query",
+-                "data": row.raw_data
++                "data": JSON.stringify(data)
+               };
+               connection.sendUTF(JSON.stringify(event));
+             });
+
+From 5d4274f04c5aa674c2d6c1a4befb0aeaaccfea8f Mon Sep 17 00:00:00 2001
+From: Nicolas Marchildon <nicolas@marchildon.net>
+Date: Wed, 2 Mar 2016 22:11:44 -0500
+Subject: [PATCH 4/4] Re-open particle stream on close. Fixes #9
+
+---
+ app.js | 42 ++++++++++++++++++++++++++----------------
+ 1 file changed, 26 insertions(+), 16 deletions(-)
+
+diff --git a/app.js b/app.js
+index 31187d7..fdd1295 100644
+--- a/app.js
++++ b/app.js
+@@ -112,22 +112,7 @@ function connectToParticleCloud(db, eventDB) {
+             eventDB.setAttributes(dev.id, dev);
+           });
+           requestAllDeviceReplay(db);
+-          console.log(chalk.gray('Connecting to event stream.'));
+-          spark.getEventStream(false, 'mine', function(event, err) {
+-            if (err) {
+-              throw err;
+-            }
+-            try {
+-              if (event.code == "ETIMEDOUT") {
+-                console.error(chalk.red(Date() + " Timeout error"));
+-              } else {
+-                eventDB.handleEvent(event);
+-              }
+-            } catch (exception) {
+-              console.error(chalk.red("Exception: " + exception + "\n" + exception.stack));
+-              connectToParticleCloud();
+-            }
+-          });
++          openStream(eventDB);
+         },
+         function(err) {
+           console.log(chalk.red('List devices call failed: %s'), err);
+@@ -141,6 +126,31 @@ function connectToParticleCloud(db, eventDB) {
+   );
+ }
+
++function openStream(eventDB) {
++  console.log(chalk.gray('Connecting to event stream.'));
++  var stream = spark.getEventStream(false, 'mine', function(event, err) {
++    if (err) {
++      throw err;
++    }
++    try {
++      if (event.code == "ETIMEDOUT") {
++        console.error(chalk.red(Date() + " Timeout error"));
++      } else {
++        eventDB.handleEvent(event);
++      }
++    } catch (exception) {
++      console.error(chalk.red("Exception: " + exception + "\n" + exception.stack));
++      connectToParticleCloud();
++    }
++  });
++  stream.on('end', function() {
++    console.error(chalk.red(Date() + " Stream ended! Will re-open."));
++    setTimeout(function() {
++      openStream(eventDB);
++    }, 1000);
++  });
++}
++
+ function requestAllDeviceReplay(db) {
+   var sql = "select raw_events.device_id as device_id, raw_events.generation_id as generation_id, max(raw_events.serial_no) as serial_no from raw_events, (select device_id, max(generation_id) as generation_id from raw_events group by device_id) as gens where raw_events.device_id = gens.device_id and raw_events.generation_id = gens.generation_id group by raw_events.device_id";
+   db.each(sql, function(err, row) {
