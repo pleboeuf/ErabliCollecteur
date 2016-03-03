@@ -40,11 +40,14 @@ exports.CommandHandler = function(db) {
               return;
             }
             rows.forEach(function(row) {
+              +              var data = JSON.parse(row.raw_data);
+              +              data.generation = row.generation_id;
+              +              data.noSerie = row.serial_no;
               var event = {
                 "coreid": row.device_id,
-                "published_at": row.published_at,
+                "published_at": new Date(row.published_at),
                 "name": "collector/query",
-                "data": row.raw_data
+                "data": JSON.stringify(data)
               };
               connection.sendUTF(JSON.stringify(event));
             });

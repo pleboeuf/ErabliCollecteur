@@ -22,7 +22,11 @@ exports.EventDatabase = function(db) {
       var data = JSON.parse(event.data);
       self.containsEvent(event.coreid, data.generation, data.noSerie).then(function(contained) {
         if (contained) {
-          console.log("Duplicate event: %s at %s,%s %s", self.devString(event.coreid), data.generation, data.noSerie, event.data);
+          if (data.replay == 0) {
+            console.log(chalk.yellow("Dropped duplicate with non-replay attribute: %s at %s,%s %s (POSSIBLE DATA LOSS)"), self.devString(event.coreid), data.generation, data.noSerie, event.data);
+          } else {
+            console.log(chalk.gray("Ignored duplicate: %s at %s,%s %s"), self.devString(event.coreid), data.generation, data.noSerie, event.data);
+          }
         } else {
           // TODO If this is a new generation ID and it is greater than zero, request a replay of that generation from zero.
           self.insertAndNotify(event, event.coreid, data.generation, data.noSerie, publishDate, event.data);

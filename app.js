@@ -126,8 +126,9 @@ function connectToParticleCloud(db, eventDB) {
   );
 }
 
-var openStream = function() {
-  var req = spark.getEventStream(false, 'mine', function(event, err) {
+function openStream(eventDB) {
+  console.log(chalk.gray('Connecting to event stream.'));
+  var stream = spark.getEventStream(false, 'mine', function(event, err) {
     if (err) {
       throw err;
     }
@@ -142,9 +143,11 @@ var openStream = function() {
       connectToParticleCloud();
     }
   });
-  req.on('end', function() {
-    console.error(chalk.red(Date() + " Stream ended! Reopening in 3 seconds..."));
-    setTimeout(openStream, 3 * 1000);
+  stream.on('end', function() {
+    console.error(chalk.red(Date() + " Stream ended! Will re-open."));
+    setTimeout(function() {
+      openStream(eventDB);
+    }, 1000);
   });
 }
 
