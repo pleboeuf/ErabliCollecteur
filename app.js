@@ -112,22 +112,7 @@ function connectToParticleCloud(db, eventDB) {
             eventDB.setAttributes(dev.id, dev);
           });
           requestAllDeviceReplay(db);
-          console.log(chalk.gray('Connecting to event stream.'));
-          spark.getEventStream(false, 'mine', function(event, err) {
-            if (err) {
-              throw err;
-            }
-            try {
-              if (event.code == "ETIMEDOUT") {
-                console.error(chalk.red(Date() + " Timeout error"));
-              } else {
-                eventDB.handleEvent(event);
-              }
-            } catch (exception) {
-              console.error(chalk.red("Exception: " + exception + "\n" + exception.stack));
-              connectToParticleCloud();
-            }
-          });
+          openStream(eventDB);
         },
         function(err) {
           console.log(chalk.red('List devices call failed: %s'), err);
@@ -139,6 +124,31 @@ function connectToParticleCloud(db, eventDB) {
       console.log(chalk.red('Login failed: %s'), err);
     }
   );
+}
+
+function openStream(eventDB) {
+  console.log(chalk.gray('Connecting to event stream.'));
+  var stream = spark.getEventStream(false, 'mine', function(event, err) {
+    if (err) {
+      throw err;
+    }
+    try {
+      if (event.code == "ETIMEDOUT") {
+        console.error(chalk.red(Date() + " Timeout error"));
+      } else {
+        eventDB.handleEvent(event);
+      }
+    } catch (exception) {
+      console.error(chalk.red("Exception: " + exception + "\n" + exception.stack));
+      connectToParticleCloud();
+    }
+  });
+  stream.on('end', function() {
+    console.error(chalk.red(Date() + " Stream ended! Will re-open."));
+    setTimeout(function() {
+      openStream(eventDB);
+    }, 1000);
+  });
 }
 
 function requestAllDeviceReplay(db) {
