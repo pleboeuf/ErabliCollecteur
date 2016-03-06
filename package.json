@@ -11,7 +11,8 @@
     "promise": "^6.1.0",
     "spark": ">= 0.2.6",
     "sqlite3": ">= 3.0",
-    "websocket": ""
+    "websocket": "",
+    "watchout": "0.0.5"
   },
   "engines": {
     "node": ">= 0.10.25"

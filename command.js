@@ -40,9 +40,9 @@ exports.CommandHandler = function(db) {
               return;
             }
             rows.forEach(function(row) {
-            var data = JSON.parse(row.raw_data);
-            data.generation = row.generation_id;
-            data.noSerie = row.serial_no;
+              var data = JSON.parse(row.raw_data);
+              data.generation = row.generation_id;
+              data.noSerie = row.serial_no;
               var event = {
                 "coreid": row.device_id,
                 "published_at": new Date(row.published_at),

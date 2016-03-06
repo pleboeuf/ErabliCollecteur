@@ -1,5 +1,6 @@
 {
   "accessToken": "place-token-here",
   "port": 8150,
-  "database": "raw_events.sqlite3"
+  "database": "raw_events.sqlite3",
+  "streamTimeout": 60000
 }

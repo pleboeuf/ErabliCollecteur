@@ -1,3 +1,4 @@
+const chalk = require('chalk');
 const Promise = require('promise');
 
 exports.EventDatabase = function(db) {
