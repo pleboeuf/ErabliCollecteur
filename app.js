@@ -7,6 +7,7 @@ var sqlite3 = require('sqlite3').verbose();
 var express = require('express');
 var path = require('path');
 var chalk = require('chalk');
+var Watchout = require('watchout')
 
 const eventmodule = require('./event.js');
 var config = require('./config.json');
@@ -112,7 +113,7 @@ function connectToParticleCloud(db, eventDB) {
             eventDB.setAttributes(dev.id, dev);
           });
           requestAllDeviceReplay(db);
-          openStream(eventDB);
+          openStream(db, eventDB);
         },
         function(err) {
           console.log(chalk.red('List devices call failed: %s'), err);
@@ -126,7 +127,7 @@ function connectToParticleCloud(db, eventDB) {
   );
 }
 
-function openStream(eventDB) {
+function openStream(db, eventDB) {
   console.log(chalk.gray('Connecting to event stream.'));
   var stream = spark.getEventStream(false, 'mine', function(event, err) {
     if (err) {
@@ -138,15 +139,22 @@ function openStream(eventDB) {
       } else {
         eventDB.handleEvent(event);
       }
+      watchdog.reset();
     } catch (exception) {
       console.error(chalk.red("Exception: " + exception + "\n" + exception.stack));
       connectToParticleCloud();
     }
   });
+  var streamTimeout = config.streamTimeout || 60 * 1000;
+  var watchdog = new Watchout(streamTimeout, function() {
+    console.log(chalk.yellow(Date() + ' No events received in ' + streamTimeout + 'ms. Re-opening event stream.'))
+    stream.abort();
+  });
   stream.on('end', function() {
     console.error(chalk.red(Date() + " Stream ended! Will re-open."));
     setTimeout(function() {
-      openStream(eventDB);
+      requestAllDeviceReplay(db);
+      openStream(db, eventDB);
     }, 1000);
   });
 }
