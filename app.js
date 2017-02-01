@@ -112,7 +112,7 @@ function connectToParticleCloud(db, eventDB) {
           devices.forEach(function(dev)  {
             eventDB.setAttributes(dev.id, dev);
           });
-          requestAllDeviceReplay(db);
+//          requestAllDeviceReplay(db);
           openStream(db, eventDB);
         },
         function(err) {
