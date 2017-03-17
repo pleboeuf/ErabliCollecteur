@@ -18,7 +18,7 @@ var interval = setInterval(function(){
 //	console.log("File size is: " + fileSizeInBytes + ", Last mod. : " + modTime + ", dt: " + dt + " sec." + ", max delay: " + maxDelay + " sec.");
 	if (dt > timeoutLimit && !firstRunFlag){
 		console.log("Attention: Le collecteur de données à cessez de fonctionner!!!" + ", Last mod. : " + modTime);
-                console.log("Re-demarrage du collecteur...");
+                console.log(now + " Re-demarrage du collecteur...");
 		restartCollecteur();
 		maxDelay = 0;
 	}
