@@ -30,3 +30,19 @@ Then point your browser to http://localhost:8150/
 
     sudo npm install -g expresso
     expresso
+
+## To build a Docker image
+
+Building an image off an official Node base image allows to run containers
+on a system having any Node version installed - or none at all - as long
+as Docker can run.
+
+    docker build -t elecnix/erablicollecteur .
+
+That creates an image containing your config.json.
+
+To run it:
+
+    docker run -d --volume=$(pwd)/data:/data -p 8150:8150 elecnix/erablicollecteur
+
+Again, point your browser to http://localhost:8150/
