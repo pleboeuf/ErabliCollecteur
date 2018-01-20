@@ -10,3 +10,5 @@ pid/
 run.sh
 config.json
 ErabliWatchDog/CollecteurRestart.log
+*.bk
+*.bak
