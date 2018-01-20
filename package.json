@@ -8,12 +8,12 @@
   "dependencies": {
     "chalk": "",
     "express": "^3.4.0",
+    "particle-api-js": ">=5.3.1",
     "promise": "^6.1.0",
     "spark": ">= 0.2.6",
-    "particle-api-js": ">=5.3.1",
-    "sqlite3": ">= 3.0",
-    "websocket": "",
-    "watchout": "0.0.5"
+    "sqlite3": "^3.1.13",
+    "watchout": "0.0.5",
+    "websocket": ""
   },
   "engines": {
     "node": ">= 0.10.25"
