@@ -1,0 +1,18 @@
+[Unit]
+Description=Collecteur de données pour Erabliere
+After=network-online.target
+
+[Service]
+Type=simple
+
+User=erabliere
+Group=erabliere
+WorkingDirectory=/home/erabliere/ErabliCollecteur
+PIDFile=/home/erabliere/ErabliCollecteur/pid/app.pid
+#LOGFile=/home/erabliere/ErabliCollecteur/log/app.log
+ExecStart=/home/erabliere/.nvm/versions/node/v9.4.0/bin/node /home/erabliere/ErabliCollecteur/app.js
+Restart=on-abnormal
+TimeoutSec=15
+
+[Install]
+WantedBy=multi-user.target
