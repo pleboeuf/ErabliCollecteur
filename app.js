@@ -145,7 +145,7 @@ function openStream(db, eventDB) {
       connectToParticleCloud();
     }
   });
-  var streamTimeout = config.streamTimeout || 60 * 1000;
+  var streamTimeout = config.streamTimeout || 300 * 1000;
   var watchdog = new Watchout(streamTimeout, function() {
     console.log(chalk.yellow(Date() + ' No events received in ' + streamTimeout + 'ms. Re-opening event stream.'))
     stream.abort();
@@ -178,22 +178,26 @@ function requestAllDeviceReplay(db) {
 function requestDeviceReplay(deviceId, generationId, serialNo) {
   console.log(chalk.gray("Requesting replay on %s at %s,%s"), devString(deviceId), generationId, serialNo);
   spark.getDevice(deviceId, function(err, device) {
-    device.callFunction('replay', "" + serialNo + ", " + generationId, function(err, data) {
-      // Return codes:
-      //   0  Success
-      //  -1  Failure
-      //  -2  A replay is already in progress
-      // -99  Invalid generation ID
-      if (err) {
-        console.error(chalk.red("Replay request failed: '%s' on %s at %s,%s with data: %s. EVENTS MAY BE LOST! Ensure the device is online, then restart the collector to request a new replay."), err, devString(deviceId), generationId, serialNo, data);
-      } else {
-        if (data.return_value == 0) {
-          console.log(chalk.green('Replay request on %s successful.'), devString(deviceId));
+
+    if (device != null){
+      device.callFunction('replay', "" + serialNo + ", " + generationId, function(err, data) {
+        // Return codes:
+        //   0  Success
+        //  -1  Failure
+        //  -2  A replay is already in progress
+        // -99  Invalid generation ID
+        if (err) {
+          console.error(chalk.red("Replay request failed: '%s' on %s at %s,%s with data: %s. EVENTS MAY BE LOST! Ensure the device is online, then restart the collector to request a new replay."), err, devString(deviceId), generationId, serialNo, data);
         } else {
-          console.log(chalk.yellow('Replay request refused by %s at %s,%s with code %s. EVENTS MAY BE LOST! Waiting for events.'), devString(deviceId), generationId, serialNo, data.return_value);
+          if (data.return_value == 0) {
+            console.log(chalk.green('Replay request on %s successful.'), devString(deviceId));
+          } else {
+            console.log(chalk.yellow('Replay request refused by %s at %s,%s with code %s. EVENTS MAY BE LOST! Waiting for events.'), devString(deviceId), generationId, serialNo, data.return_value);
+          }
         }
-      }
-    });
+      });
+    }
+
   });
 }
 

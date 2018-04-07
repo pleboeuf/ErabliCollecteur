@@ -1,7 +1,14 @@
 *.sqlite3
 *.csv
 node_modules/
+.idea/
+.run.sh.swp
+ErabliWatchDog/
+log/
+pid/
 
 run.sh
 config.json
 ErabliWatchDog/CollecteurRestart.log
+*.bk
+*.bak
