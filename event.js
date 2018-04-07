@@ -23,7 +23,9 @@ exports.EventDatabase = function(db) {
       var data = JSON.parse(event.data);
       self.containsEvent(event.coreid, data.generation, data.noSerie).then(function(contained) {
         if (contained) {
-          if (data.replay == 0) {
+          if (event.upstream) {
+            console.log(chalk.gray("Ignored duplicate upstream event: %s at %s,%s %s"), self.devString(event.coreid), data.generation, data.noSerie, event.data);
+          } else if (data.replay == 0) {
             console.log(chalk.yellow("Dropped duplicate with non-replay attribute: %s at %s,%s %s (POSSIBLE DATA LOSS)"), self.devString(event.coreid), data.generation, data.noSerie, event.data);
           } else {
             console.log(chalk.gray("Ignored duplicate: %s at %s,%s %s"), self.devString(event.coreid), data.generation, data.noSerie, event.data);
