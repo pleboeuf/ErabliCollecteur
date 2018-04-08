@@ -70,6 +70,12 @@ function UpstreamSources(config) {
                         console.log("Unknown upstream message type: " + message.type);
                     }
                 }.bind(this));
+
+                console.log("Requesting upstream events from all devices");
+                // TODO Only request missing events (based on generation & serial gaps)
+                connection.sendUTF(JSON.stringify({
+                    "command": "query"
+                }));
             }.bind(this));
             this.connect();
         },
@@ -83,7 +89,7 @@ function UpstreamSources(config) {
 function startApp(db) {
   console.log(chalk.gray("Starting application..."));
   eventDB = new eventmodule.EventDatabase(db);
-  var commandHandler = require('./command.js').CommandHandler(db);
+  var commandHandler = require('./command.js').CommandHandler(db, config.blacklist);
   var app = createExpressApp(db);
   connectToParticleCloud(db, eventDB);
   try {
@@ -94,7 +100,7 @@ function startApp(db) {
     server.listen(port);
     console.log(chalk.green('Server started: http://localhost:%s'), port);
     var upstream = new UpstreamSources(config);
-    upstream.joinOthers();
+    // upstream.joinOthers();
   } catch (err) {
     console.error(err);
     throw err;
@@ -305,7 +311,9 @@ function createWebSocketServer(server, eventDB, commandHandler) {
   });
   eventDB.onEvent(function(event) {
     connectedClients.forEach(function(connection) {
-      connection.sendUTF(JSON.stringify(event));
+        if (connection.subscribed) {
+            connection.sendUTF(JSON.stringify(event));
+        }
     });
   });
 }
