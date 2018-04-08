@@ -8,6 +8,7 @@ var express = require('express');
 var path = require('path');
 var chalk = require('chalk');
 var Watchout = require('watchout')
+var WebSocketClient = require('websocket').client;
 
 const eventmodule = require('./event.js');
 var config = require('./config.json');
@@ -19,10 +20,76 @@ function devString(deviceId) {
   return eventDB.devString(deviceId);
 }
 
+function UpstreamSources(config) {
+
+    var uri = config.collectors[0].uri;
+    var connectBackoff = 500;
+    var client = new WebSocketClient();
+    var connection;
+    var onConnectSuccess;
+    var connectPromise = new Promise(function(complete, reject) {
+        onConnectSuccess = complete;
+    });
+
+    return {
+        connect: function () {
+            console.log('Connecting upstream', uri);
+            client.connect(uri, 'event-stream');
+        },
+        reconnect: function () {
+            connectBackoff = Math.min(connectBackoff * 2, 1000 * 60);
+            setTimeout(this.connect, connectBackoff);
+        },
+        joinOthers: function () {
+            client.on('connectFailed', function (error) {
+                console.log('Connect Error: ' + error.toString());
+                this.reconnect();
+            }.bind(this));
+            client.on('connect', function (con) {
+                connection = con;
+                connectBackoff = 1;
+                console.log('WebSocket Client Connected to: ' + uri);
+                onConnectSuccess(connection);
+                connection.on('error', function (error) {
+                    console.log("Connection Error: " + error.toString());
+                    this.reconnect();
+                }.bind(this));
+                connection.on('close', function () {
+                    console.log('event-stream Connection Closed');
+                    this.reconnect();
+                }.bind(this));
+                connection.on('message', function (message) {
+                    if (message.type === 'utf8') {
+                        console.log("Upstream: '" + message.utf8Data + "'");
+                        try {
+                            this.handleMessage(JSON.parse(message.utf8Data));
+                        } catch (exception) {
+                            console.log("Failed to handle upstream message: " + message.utf8Data, exception.stack);
+                        }
+                    } else {
+                        console.log("Unknown upstream message type: " + message.type);
+                    }
+                }.bind(this));
+
+                console.log("Requesting upstream events from all devices");
+                // TODO Only request missing events (based on generation & serial gaps)
+                connection.sendUTF(JSON.stringify({
+                    "command": "query"
+                }));
+            }.bind(this));
+            this.connect();
+        },
+        handleMessage: function (event) {
+            event.upstream = true;
+            eventDB.handleEvent(event);
+        }.bind(this)
+    };
+}
+
 function startApp(db) {
   console.log(chalk.gray("Starting application..."));
   eventDB = new eventmodule.EventDatabase(db);
-  var commandHandler = require('./command.js').CommandHandler(db);
+  var commandHandler = require('./command.js').CommandHandler(db, config.blacklist);
   var app = createExpressApp(db);
   connectToParticleCloud(db, eventDB);
   try {
@@ -32,6 +99,8 @@ function startApp(db) {
     createWebSocketServer(server, eventDB, commandHandler);
     server.listen(port);
     console.log(chalk.green('Server started: http://localhost:%s'), port);
+    var upstream = new UpstreamSources(config);
+    // upstream.joinOthers();
   } catch (err) {
     console.error(err);
     throw err;
@@ -242,7 +311,9 @@ function createWebSocketServer(server, eventDB, commandHandler) {
   });
   eventDB.onEvent(function(event) {
     connectedClients.forEach(function(connection) {
-      connection.sendUTF(JSON.stringify(event));
+        if (connection.subscribed) {
+            connection.sendUTF(JSON.stringify(event));
+        }
     });
   });
 }
