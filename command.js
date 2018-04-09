@@ -61,6 +61,7 @@ exports.CommandHandler = function (db, blacklist) {
             const elem = iterator.next();
             if (elem.done) {
                 doneSending();
+                db.close();
                 return;
             }
             const row = elem.value;
