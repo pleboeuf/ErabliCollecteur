@@ -13,7 +13,7 @@
     "promise": "^6.1.0",
     "spark": ">= 0.2.6",
     "watchout": "0.0.5",
-    "websocket": ""
+    "ws": "^5.1.1"
   },
   "engines": {
     "node": ">= 0.10.25"
