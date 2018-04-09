@@ -12,39 +12,81 @@ exports.CommandHandler = function (db, blacklist) {
         }
     }
 
-    function sendRow(row, connection, context) {
-        try {
-            if (isBlacklisted(row)) {
-                return;
-            }
-            if (row.published_at === null || row.generation_id === null) {
-                // console.log("Skipping invalid row", row);
-                return;
-            }
-            const data = JSON.parse(row.raw_data);
-            data.generation = row.generation_id;
-            data.noSerie = row.serial_no;
-            const event = {
-                "coreid": row.device_id,
-                "published_at": new Date(row.published_at),
-                "name": data.eName,
-                "data": JSON.stringify(data),
-                "context": context
-            };
-            connection.send(JSON.stringify(event));
-        } catch (error) {
-            console.error("Error replaying event: " + error, row);
+    function handleQuery(command, connection) {
+        const hasDeviceParam = (typeof command.device !== "undefined");
+        const hasGenerationParam = (typeof command.generation !== "undefined");
+        const hasAfterParam = (typeof command.after !== "undefined");
+        if (hasAfterParam && !hasDeviceParam) {
             connection.send(JSON.stringify({
-                name: "collector/error",
+                "error": "parameter 'device' is mandatory with 'after' parameter"
+            }));
+        }
+        if (hasAfterParam && !hasGenerationParam) {
+            connection.send(JSON.stringify({
+                "error": "parameter 'generation' is mandatory with 'after' parameter"
+            }));
+        }
+        var sql = "select * from raw_events";
+        var params = [];
+        if (hasDeviceParam) {
+            sql = sql + " where device_id = ?";
+            params.push(command.device);
+        }
+        if (hasAfterParam) {
+            sql = sql + " and serial_no > ?";
+            params.push(command.after);
+        }
+        if (hasGenerationParam) {
+            sql = sql + " and generation_id = ?";
+            params.push(command.generation);
+        }
+        sql = sql + " order by generation_id, serial_no";
+
+        // TODO Abort query when connection closes.
+        const iterator = db.prepare(sql).iterate(params);
+        command.sent = 0;
+
+        function doneSending() {
+            console.log("Completed.", command);
+            connection.send(JSON.stringify({
+                name: "collector/querycomplete",
                 data: {
-                    message: "Error replaying event",
-                    error: error,
                     command: command,
-                    sql: sql,
-                    row: row
+                    sql: sql
                 }
             }));
         }
+
+        function sendNext() {
+            const elem = iterator.next();
+            if (elem.done) {
+                doneSending();
+                return;
+            }
+            const row = elem.value;
+            if (isBlacklisted(row)) {
+                // Ignore
+                sendNext();
+            } else if (row.published_at === null || row.generation_id === null) {
+                // console.log("Skipping invalid row", row);
+                sendNext();
+            } else {
+                const data = JSON.parse(row.raw_data);
+                data.generation = row.generation_id;
+                data.noSerie = row.serial_no;
+                const event = {
+                    "coreid": row.device_id,
+                    "published_at": new Date(row.published_at),
+                    "name": data.eName,
+                    "data": JSON.stringify(data)
+                    // "context": {command: command, sql: sql, row: row}
+                };
+                command.sent += 1;
+                connection.send(JSON.stringify(event), sendNext);
+            }
+        }
+
+        sendNext();
     }
 
     return {
@@ -53,45 +95,7 @@ exports.CommandHandler = function (db, blacklist) {
             if (command.command === "subscribe") {
                 connection.subscribed = true;
             } else if (command.command === "query") {
-                const hasDeviceParam = (typeof command.device !== "undefined");
-                const hasGenerationParam = (typeof command.generation !== "undefined");
-                const hasAfterParam = (typeof command.after !== "undefined");
-                if (hasAfterParam && !hasDeviceParam) {
-                    connection.send(JSON.stringify({
-                        "error": "parameter 'device' is mandatory with 'after' parameter"
-                    }));
-                }
-                if (hasAfterParam && !hasGenerationParam) {
-                    connection.send(JSON.stringify({
-                        "error": "parameter 'generation' is mandatory with 'after' parameter"
-                    }));
-                }
-                var sql = "select * from raw_events";
-                var params = [];
-                if (hasDeviceParam) {
-                    sql = sql + " where device_id = ?";
-                    params.push(command.device);
-                }
-                if (hasAfterParam) {
-                    sql = sql + " and serial_no > ?";
-                    params.push(command.after);
-                }
-                if (hasGenerationParam) {
-                    sql = sql + " and generation_id = ?";
-                    params.push(command.generation);
-                }
-                sql = sql + " order by generation_id, serial_no";
-                // TODO Abort query when connection closes.
-                for (var row of db.prepare(sql).iterate(params)) {
-                    sendRow(row, connection, {command: command, sql: sql, row: row});
-                }
-                connection.send(JSON.stringify({
-                    name: "collector/querycomplete",
-                    data: {
-                        command: command,
-                        sql: sql
-                    }
-                }));
+                handleQuery(command, connection);
             } else {
                 connection.send(JSON.stringify({
                     name: "collector/error",

@@ -1,15 +1,14 @@
-var fs = require('fs');
-var Promise = require('promise');
-var readFile = Promise.denodeify(fs.readFile);
+const fs = require('fs');
+const Promise = require('promise');
+const readFile = Promise.denodeify(fs.readFile);
 const http = require('http');
-var spark = require('spark');
-var sqlite3 = require('better-sqlite3');
-var express = require('express');
-var path = require('path');
-var chalk = require('chalk');
-var Watchout = require('watchout')
-
-const url = require('url');
+const spark = require('spark');
+const sqlite3 = require('better-sqlite3');
+const express = require('express');
+const path = require('path');
+const chalk = require('chalk');
+const Watchout = require('watchout')
+const Command = require('./command.js');
 const WebSocket = require('ws');
 
 const eventmodule = require('./event.js');
@@ -25,14 +24,13 @@ function devString(deviceId) {
 function startApp(db) {
     console.log(chalk.gray("Starting application..."));
     eventDB = new eventmodule.EventDatabase(db);
-    var commandHandler = require('./command.js').CommandHandler(db, config.blacklist);
     var app = createExpressApp(db);
     connectToParticleCloud(db, eventDB);
     try {
         var port = config.port || '3000';
         app.set('port', port);
         var server = http.createServer(app);
-        createWebSocketServer(server, eventDB, commandHandler);
+        createWebSocketServer(server, eventDB);
         server.listen(port);
         console.log(chalk.green('Server started: http://localhost:%s'), port);
     } catch (err) {
@@ -206,12 +204,15 @@ function createWebSocketServer(server, eventDB, commandHandler) {
         connectedClients.push(ws);
         console.log(chalk.gray((new Date()) + ' Connection accepted. Connections: ' + connectedClients.length), req.socket.remoteAddress);
         ws.on('message', function incoming(message) {
+            const db = new sqlite3(dbFile, {readonly: true});
             try {
                 console.log(chalk.gray('Received Message: %s'), message);
                 var command = JSON.parse(message);
+                const commandHandler = Command.CommandHandler(db, config.blacklist);
                 commandHandler.onCommand(command, ws);
             } catch (exception) {
                 console.error(chalk.red(exception));
+                db.close();
             }
         });
         ws.on('close', function (reasonCode, description) {
@@ -223,7 +224,7 @@ function createWebSocketServer(server, eventDB, commandHandler) {
     eventDB.onEvent(function (event) {
         connectedClients.forEach(function (connection) {
             if (connection.subscribed) {
-                connection.sendUTF(JSON.stringify(event));
+                connection.send(JSON.stringify(event));
             }
         });
     });
