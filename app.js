@@ -3,7 +3,7 @@ var Promise = require('promise');
 var readFile = Promise.denodeify(fs.readFile);
 var http = require('http');
 var spark = require('spark');
-var sqlite3 = require('sqlite3').verbose();
+var sqlite3 = require('better-sqlite3');
 var express = require('express');
 var path = require('path');
 var chalk = require('chalk');
@@ -22,68 +22,68 @@ function devString(deviceId) {
 
 function UpstreamSources(config) {
 
-    var uri = config.collectors[0].uri;
-    var connectBackoff = 500;
-    var client = new WebSocketClient();
-    var connection;
-    var onConnectSuccess;
-    var connectPromise = new Promise(function(complete, reject) {
-        onConnectSuccess = complete;
-    });
+  var uri = config.collectors[0].uri;
+  var connectBackoff = 500;
+  var client = new WebSocketClient();
+  var connection;
+  var onConnectSuccess;
+  var connectPromise = new Promise(function (complete, reject) {
+    onConnectSuccess = complete;
+  });
 
-    return {
-        connect: function () {
-            console.log('Connecting upstream', uri);
-            client.connect(uri, 'event-stream');
-        },
-        reconnect: function () {
-            connectBackoff = Math.min(connectBackoff * 2, 1000 * 60);
-            setTimeout(this.connect, connectBackoff);
-        },
-        joinOthers: function () {
-            client.on('connectFailed', function (error) {
-                console.log('Connect Error: ' + error.toString());
-                this.reconnect();
-            }.bind(this));
-            client.on('connect', function (con) {
-                connection = con;
-                connectBackoff = 1;
-                console.log('WebSocket Client Connected to: ' + uri);
-                onConnectSuccess(connection);
-                connection.on('error', function (error) {
-                    console.log("Connection Error: " + error.toString());
-                    this.reconnect();
-                }.bind(this));
-                connection.on('close', function () {
-                    console.log('event-stream Connection Closed');
-                    this.reconnect();
-                }.bind(this));
-                connection.on('message', function (message) {
-                    if (message.type === 'utf8') {
-                        console.log("Upstream: '" + message.utf8Data + "'");
-                        try {
-                            this.handleMessage(JSON.parse(message.utf8Data));
-                        } catch (exception) {
-                            console.log("Failed to handle upstream message: " + message.utf8Data, exception.stack);
-                        }
-                    } else {
-                        console.log("Unknown upstream message type: " + message.type);
-                    }
-                }.bind(this));
+  return {
+    connect: function () {
+      console.log('Connecting upstream', uri);
+      client.connect(uri, 'event-stream');
+    },
+    reconnect: function () {
+      connectBackoff = Math.min(connectBackoff * 2, 1000 * 60);
+      setTimeout(this.connect, connectBackoff);
+    },
+    joinOthers: function () {
+      client.on('connectFailed', function (error) {
+        console.log('Connect Error: ' + error.toString());
+        this.reconnect();
+      }.bind(this));
+      client.on('connect', function (con) {
+        connection = con;
+        connectBackoff = 1;
+        console.log('WebSocket Client Connected to: ' + uri);
+        onConnectSuccess(connection);
+        connection.on('error', function (error) {
+          console.log("Connection Error: " + error.toString());
+          this.reconnect();
+        }.bind(this));
+        connection.on('close', function () {
+          console.log('event-stream Connection Closed');
+          this.reconnect();
+        }.bind(this));
+        connection.on('message', function (message) {
+          if (message.type === 'utf8') {
+            console.log("Upstream: '" + message.utf8Data + "'");
+            try {
+              this.handleMessage(JSON.parse(message.utf8Data));
+            } catch (exception) {
+              console.log("Failed to handle upstream message: " + message.utf8Data, exception.stack);
+            }
+          } else {
+            console.log("Unknown upstream message type: " + message.type);
+          }
+        }.bind(this));
 
-                console.log("Requesting upstream events from all devices");
-                // TODO Only request missing events (based on generation & serial gaps)
-                connection.sendUTF(JSON.stringify({
-                    "command": "query"
-                }));
-            }.bind(this));
-            this.connect();
-        },
-        handleMessage: function (event) {
-            event.upstream = true;
-            eventDB.handleEvent(event);
-        }.bind(this)
-    };
+        console.log("Requesting upstream events from all devices");
+        // TODO Only request missing events (based on generation & serial gaps)
+        connection.sendUTF(JSON.stringify({
+          "command": "query"
+        }));
+      }.bind(this));
+      this.connect();
+    },
+    handleMessage: function (event) {
+      event.upstream = true;
+      eventDB.handleEvent(event);
+    }.bind(this)
+  };
 }
 
 function startApp(db) {
@@ -108,31 +108,28 @@ function startApp(db) {
 }
 
 function ensureDatabase() {
-  return new Promise(function(resolve, reject) {
-    fs.open(dbFile, 'r', function(err, fd) {
+  return new Promise(function (resolve, reject) {
+    fs.open(dbFile, 'r', function (err, fd) {
       if (err) {
         console.log(chalk.gray("Creating database: %s"), dbFile);
         readFile('schema.sql', 'utf8').then(createDatabase).then(resolve, reject);
       } else {
         console.log(chalk.gray("Using existing database: %s"), dbFile);
-        resolve(new sqlite3.Database(dbFile, sqlite3.OPEN_READWRITE));
+        resolve(new sqlite3(dbFile));
       }
     });
   });
 }
 
 function createDatabase(schema) {
-  return new Promise(function(resolve, reject) {
-    var db = new sqlite3.Database(dbFile);
-    db.serialize(function() {
-      db.run(schema, function(err) {
-        if (err != null) {
-          reject(err);
-        } else {
-          resolve(db);
-        }
-      });
-    });
+  return new Promise(function (resolve, reject) {
+    try {
+      var db = new sqlite3(dbFile);
+      db.prepare(schema).run();
+      resolve(db);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
@@ -142,29 +139,27 @@ function createExpressApp() {
   app.use(express.logger());
   app.use(express.static(path.join(__dirname, 'public')));
   app.use('/', express.static(path.join(__dirname, 'index.html')));
-  app.get('/device/:id', function(req, res) {
-    db.serialize(function() {
-      var generationId = req.query.generation;
-      var serialNo = req.query.since;
-      var sql = "select * from raw_events where device_id = ? and generation_id = ? and serial_no > ?";
-      var params = [req.params.id, generationId, serialNo];
-      db.all(sql, params, function(err, rows) {
-        if (err) {
-          console.log(chalk.red(err));
-          return res.send(500, err);
-        }
-        var events = rows.map(function(row) {
-          return {
-            "coreid": row.device_id,
-            "published_at": row.published_at,
-            "name": "collector/replay",
-            "data": row.raw_data
-          };
-        });
-        res.setHeader("Content-Type", "text/plain");
-        res.send(JSON.stringify(events));
+  app.get('/device/:id', function (req, res) {
+    var generationId = req.query.generation;
+    var serialNo = req.query.since;
+    var sql = "select * from raw_events where device_id = ? and generation_id = ? and serial_no > ?";
+    var params = [req.params.id, generationId, serialNo];
+    try {
+      const rows = db.prepare(sql).all(params);
+      var events = rows.map(function (row) {
+        return {
+          "coreid": row.device_id,
+          "published_at": row.published_at,
+          "name": "collector/replay",
+          "data": row.raw_data
+        };
       });
-    });
+      res.setHeader("Content-Type", "text/plain");
+      res.send(JSON.stringify(events));
+    } catch (err) {
+      console.log(chalk.red(err));
+      return res.send(500, err);
+    }
   });
   return app;
 }
@@ -173,24 +168,24 @@ function connectToParticleCloud(db, eventDB) {
   spark.login({
     accessToken: accessToken
   }).then(
-    function(token) {
+    function (token) {
       console.log(chalk.gray('Login to cloud completed. Listing devices...'));
       spark.listDevices().then(
-        function(devices) {
+        function (devices) {
           console.log(chalk.gray('Got %s devices from cloud.'), devices.length);
-          devices.forEach(function(dev)  {
+          devices.forEach(function (dev) {
             eventDB.setAttributes(dev.id, dev);
           });
 //          requestAllDeviceReplay(db);
           openStream(db, eventDB);
         },
-        function(err) {
+        function (err) {
           console.log(chalk.red('List devices call failed: %s'), err);
           connectToParticleCloud();
         }
       );
     },
-    function(err) {
+    function (err) {
       console.log(chalk.red('Login failed: %s'), err);
     }
   );
@@ -198,7 +193,7 @@ function connectToParticleCloud(db, eventDB) {
 
 function openStream(db, eventDB) {
   console.log(chalk.gray('Connecting to event stream.'));
-  var stream = spark.getEventStream(false, 'mine', function(event, err) {
+  var stream = spark.getEventStream(false, 'mine', function (event, err) {
     if (err) {
       throw err;
     }
@@ -215,13 +210,13 @@ function openStream(db, eventDB) {
     }
   });
   var streamTimeout = config.streamTimeout || 300 * 1000;
-  var watchdog = new Watchout(streamTimeout, function() {
+  var watchdog = new Watchout(streamTimeout, function () {
     console.log(chalk.yellow(Date() + ' No events received in ' + streamTimeout + 'ms. Re-opening event stream.'))
     stream.abort();
   });
-  stream.on('end', function() {
+  stream.on('end', function () {
     console.error(chalk.red(Date() + " Stream ended! Will re-open."));
-    setTimeout(function() {
+    setTimeout(function () {
       requestAllDeviceReplay(db);
       openStream(db, eventDB);
     }, 1000);
@@ -230,7 +225,7 @@ function openStream(db, eventDB) {
 
 function requestAllDeviceReplay(db) {
   var sql = "select raw_events.device_id as device_id, raw_events.generation_id as generation_id, max(raw_events.serial_no) as serial_no from raw_events, (select device_id, max(generation_id) as generation_id from raw_events group by device_id) as gens where raw_events.device_id = gens.device_id and raw_events.generation_id = gens.generation_id group by raw_events.device_id";
-  db.each(sql, function(err, row) {
+  db.each(sql, function (err, row) {
     if (err) {
       throw err;
     } else if (row.device_id == null) {
@@ -246,10 +241,10 @@ function requestAllDeviceReplay(db) {
 
 function requestDeviceReplay(deviceId, generationId, serialNo) {
   console.log(chalk.gray("Requesting replay on %s at %s,%s"), devString(deviceId), generationId, serialNo);
-  spark.getDevice(deviceId, function(err, device) {
+  spark.getDevice(deviceId, function (err, device) {
 
-    if (device != null){
-      device.callFunction('replay', "" + serialNo + ", " + generationId, function(err, data) {
+    if (device != null) {
+      device.callFunction('replay', "" + serialNo + ", " + generationId, function (err, data) {
         // Return codes:
         //   0  Success
         //  -1  Failure
@@ -283,7 +278,7 @@ function createWebSocketServer(server, eventDB, commandHandler) {
     return true;
   }
 
-  wsServer.on('request', function(request) {
+  wsServer.on('request', function (request) {
     try {
       if (!originIsAllowed(request.origin)) {
         // Make sure we only accept requests from an allowed origin
@@ -294,14 +289,14 @@ function createWebSocketServer(server, eventDB, commandHandler) {
       var connection = request.accept('event-stream', request.origin);
       connectedClients.push(connection);
       console.log(chalk.gray((new Date()) + ' Connection accepted from ' + connection.remoteAddress + '. Connections: ' + connectedClients.length));
-      connection.on('message', function(message) {
+      connection.on('message', function (message) {
         if (message.type === 'utf8') {
           console.log(chalk.gray('Received Message: %s'), message.utf8Data);
           var command = JSON.parse(message.utf8Data);
           commandHandler.onCommand(command, connection);
         }
       });
-      connection.on('close', function(reasonCode, description) {
+      connection.on('close', function (reasonCode, description) {
         connectedClients.splice(connectedClients.indexOf(connection), 1);
         console.log(chalk.gray((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected. Connections: ' + connectedClients.length));
       });
@@ -309,15 +304,15 @@ function createWebSocketServer(server, eventDB, commandHandler) {
       console.error(chalk.red(exception));
     }
   });
-  eventDB.onEvent(function(event) {
-    connectedClients.forEach(function(connection) {
-        if (connection.subscribed) {
-            connection.sendUTF(JSON.stringify(event));
-        }
+  eventDB.onEvent(function (event) {
+    connectedClients.forEach(function (connection) {
+      if (connection.subscribed) {
+        connection.sendUTF(JSON.stringify(event));
+      }
     });
   });
 }
 
-ensureDatabase().then(startApp).catch(function(err) {
+ensureDatabase().then(startApp).catch(function (err) {
   console.error(chalk.red(err));
 });
