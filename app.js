@@ -16,6 +16,7 @@ var config = require('./config.json');
 var dbFile = config.database || 'raw_events.sqlite3';
 var accessToken = config.accessToken;
 var eventDB;
+const nodeArg = process.argv;
 
 function devString(deviceId) {
     return eventDB.devString(deviceId);
@@ -25,7 +26,10 @@ function startApp(db) {
     console.log(chalk.gray("Starting application..."));
     eventDB = new eventmodule.EventDatabase(db);
     var app = createExpressApp(db);
-    connectToParticleCloud(db, eventDB);
+    // Do not connect to Particle cloud for playbackOnly
+    if (nodeArg[2] === undefined || nodeArg[2] !== "playbackOnly") {
+        connectToParticleCloud(db, eventDB)
+    };
     try {
         var port = config.port || '3000';
         app.set('port', port);
