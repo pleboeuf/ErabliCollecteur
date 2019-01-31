@@ -71,8 +71,8 @@ function createDatabase(schema) {
 
 function createExpressApp() {
     var app = express();
-    app.use(app.router);
-    app.use(express.logger());
+    // app.use(app.router);
+    // app.use(express.logger());
     app.use(express.static(path.join(__dirname, 'public')));
     app.use('/', express.static(path.join(__dirname, 'index.html')));
     app.get('/device/:id', function (req, res) {
