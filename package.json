@@ -10,6 +10,7 @@
     "chalk": "",
     "express": "^4.16.4",
     "hawk": "^7.0.7",
+    "integer": "^2.1.0",
     "node-gyp": "^3.8.0",
     "particle-api-js": "^7.3.0",
     "promise": "^8.0.2",

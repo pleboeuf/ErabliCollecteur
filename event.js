@@ -14,7 +14,8 @@ exports.EventDatabase = function (db) {
   };
 
   this.handleEvent = function (event) {
-    var publishDate = new Date(event.published_at);
+    // var publishDate = new Date(event.published_at);
+    const publishDate = event.published_at;
     if (event.name.lastIndexOf("spark/", 0) != -1) {
       console.warn("Spark event: " + JSON.stringify(event));
       return
@@ -60,6 +61,7 @@ exports.EventDatabase = function (db) {
         complete();
       } catch (err) {
         reject(err);
+        console.error("insertEvent Error: ", err);
       }
     });
   };
@@ -73,6 +75,7 @@ exports.EventDatabase = function (db) {
         complete(typeof row !== "undefined");
       } catch (err) {
         reject(err);
+        console.error("containsEvent Error: ", err);
       }
     });
   };
