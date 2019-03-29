@@ -150,13 +150,13 @@ function openStream(db, eventDB) {
         console.log(chalk.yellow(Date() + ' No events received in ' + streamTimeout + 'ms. Re-opening event stream.'))
         stream.abort();
     });
-    stream.on('end', function () {
-        console.error(chalk.red(Date() + " Stream ended! Will re-open."));
-        setTimeout(function () {
-            requestAllDeviceReplay(db);
-            openStream(db, eventDB);
-        }, 1000);
-    });
+    // stream.on('end', function () {
+    //     console.error(chalk.red(Date() + " Stream ended! Will re-open."));
+    //     setTimeout(function () {
+    //         requestAllDeviceReplay(db);
+    //         openStream(db, eventDB);
+    //     }, 1000);
+    // });
 }
 
 function requestAllDeviceReplay(db) {
