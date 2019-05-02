@@ -72,18 +72,26 @@ exports.CommandHandler = function (db, blacklist) {
                 // console.log("Skipping invalid row", row);
                 sendNext();
             } else {
-                const data = JSON.parse(row.raw_data);
-                data.generation = row.generation_id;
-                data.noSerie = row.serial_no;
-                const event = {
-                    "coreid": row.device_id,
-                    "published_at": new Date(row.published_at),
-                    "name": data.eName,
-                    "data": JSON.stringify(data)
-                    // "context": {command: command, sql: sql, row: row}
-                };
-                command.sent += 1;
-                connection.send(JSON.stringify(event), sendNext);
+                try {
+                    const data = JSON.parse(row.raw_data);
+                    data.generation = row.generation_id;
+                    data.noSerie = row.serial_no;
+                    const event = {
+                        "coreid": row.device_id,
+                        "published_at": new Date(row.published_at),
+                        "name": data.eName,
+                        "data": JSON.stringify(data)
+                        // "context": {command: command, sql: sql, row: row}
+                    };
+                    command.sent += 1;
+                    connection.send(JSON.stringify(event), sendNext);
+                    // catch error and skip in case the JSON contains errors
+                } catch (error) {
+                    console.log("JSON: ", row.raw_data);
+                    console.log("Error", error);
+                    sendNext();
+                }
+
             }
         }
 
