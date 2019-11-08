@@ -27,9 +27,9 @@ function startApp(db) {
     eventDB = new eventmodule.EventDatabase(db);
     var app = createExpressApp(db);
     // Do not connect to Particle cloud for playbackOnly
-    if (nodeArg[2] === undefined || nodeArg[2] !== "playbackOnly") {
-        connectToParticleCloud(db, eventDB)
-    };
+    
+    connectToParticleCloud(db, eventDB, nodeArg[2], nodeArg[3])
+
     try {
         var port = config.port || '3000';
         app.set('port', port);
@@ -100,7 +100,7 @@ function createExpressApp() {
     return app;
 }
 
-function connectToParticleCloud(db, eventDB) {
+function connectToParticleCloud(db, eventDB, streamOption, replayOption) {
     spark.login({
         accessToken: accessToken
     }).then(
@@ -112,8 +112,12 @@ function connectToParticleCloud(db, eventDB) {
                     devices.forEach(function (dev) {
                         eventDB.setAttributes(dev.id, dev);
                     });
-//          requestAllDeviceReplay(db);
-                    openStream(db, eventDB);
+                    if (replayOption === "allDeviceReplay"){
+                        requestAllDeviceReplay(db);
+                    }
+                    if (streamOption !== "noStream"){
+                        openStream(db, eventDB);
+                    }
                 },
                 function (err) {
                     console.log(chalk.red('List devices call failed: %s'), err);
@@ -161,6 +165,7 @@ function openStream(db, eventDB) {
 
 function requestAllDeviceReplay(db) {
     var sql = "select raw_events.device_id as device_id, raw_events.generation_id as generation_id, max(raw_events.serial_no) as serial_no from raw_events, (select device_id, max(generation_id) as generation_id from raw_events group by device_id) as gens where raw_events.device_id = gens.device_id and raw_events.generation_id = gens.generation_id group by raw_events.device_id";
+    console.log(chalk.blue('Requesting playback!!!'))
     db.each(sql, function (err, row) {
         if (err) {
             throw err;
