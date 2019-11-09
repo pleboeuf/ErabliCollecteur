@@ -16,7 +16,6 @@
     "node-gyp": "^3.8.0",
     "particle-api-js": "^7.3.0",
     "promise": "^8.0.2",
-    "spark": ">= 0.2.6",
     "sshpk": "^1.16.1",
     "watchout": "0.0.5",
     "ws": "^6.1.3"

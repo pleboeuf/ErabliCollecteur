@@ -2,7 +2,8 @@ const fs = require('fs');
 const Promise = require('promise');
 const readFile = Promise.denodeify(fs.readFile);
 const http = require('http');
-const spark = require('spark');
+// const spark = require('spark');
+const Particle = require('particle-api-js');
 const sqlite3 = require('better-sqlite3');
 const express = require('express');
 const path = require('path');
@@ -14,7 +15,10 @@ const WebSocket = require('ws');
 const eventmodule = require('./event.js');
 var config = require('./config.json');
 var dbFile = config.database || 'raw_events.sqlite3';
-var accessToken = config.accessToken;
+var particle = new Particle();
+var password = config.password;
+var username = config.username;
+var accessToken;
 var eventDB;
 const nodeArg = process.argv;
 
@@ -101,15 +105,17 @@ function createExpressApp() {
 }
 
 function connectToParticleCloud(db, eventDB, streamOption, replayOption) {
-    spark.login({
-        accessToken: accessToken
+    particle.login({
+        username, password
     }).then(
-        function (token) {
+        function (data) {
+            accessToken = data.body.access_token;
             console.log(chalk.gray('Login to cloud completed. Listing devices...'));
-            spark.listDevices().then(
-                function (devices) {
-                    console.log(chalk.gray('Got %s devices from cloud.'), devices.length);
-                    devices.forEach(function (dev) {
+            particle.listDevices({ auth: accessToken }).then(
+                function (Devices) {
+                    const myDevices = Devices.body;
+                    console.log(chalk.gray('Got %s devices from cloud.'), myDevices.length);
+                    myDevices.forEach(function (dev) {
                         eventDB.setAttributes(dev.id, dev);
                     });
                     if (replayOption === "allDeviceReplay"){
@@ -133,34 +139,18 @@ function connectToParticleCloud(db, eventDB, streamOption, replayOption) {
 
 function openStream(db, eventDB) {
     console.log(chalk.gray('Connecting to event stream.'));
-    var stream = spark.getEventStream(false, 'mine', function (event, err) {
-        if (err) {
-            throw err;
-        }
-        try {
+    particle.getEventStream({ deviceId: 'mine', auth: accessToken }).then(function(stream) {
+        stream.on('event', function(event) {
+            console.log("Event: ", event);
             if (event.code == "ETIMEDOUT") {
                 console.error(chalk.red(Date() + " Timeout error"));
             } else {
                 eventDB.handleEvent(event);
             }
-            watchdog.reset();
-        } catch (exception) {
-            console.error(chalk.red("Exception: " + exception + "\n" + exception.stack));
-            connectToParticleCloud();
-        }
-    });
-    var streamTimeout = config.streamTimeout || 300 * 1000;
-    var watchdog = new Watchout(streamTimeout, function () {
-        console.log(chalk.yellow(Date() + ' No events received in ' + streamTimeout + 'ms. Re-opening event stream.'))
-        stream.abort();
-    });
-    // stream.on('end', function () {
-    //     console.error(chalk.red(Date() + " Stream ended! Will re-open."));
-    //     setTimeout(function () {
-    //         requestAllDeviceReplay(db);
-    //         openStream(db, eventDB);
-    //     }, 1000);
-    // });
+        });
+        }).catch(function(err) {
+            console.log(chalk.red('Stream failed: %s'), err);
+        });
 }
 
 function requestAllDeviceReplay(db) {
@@ -182,7 +172,7 @@ function requestAllDeviceReplay(db) {
 
 function requestDeviceReplay(deviceId, generationId, serialNo) {
     console.log(chalk.gray("Requesting replay on %s at %s,%s"), devString(deviceId), generationId, serialNo);
-    spark.getDevice(deviceId, function (err, device) {
+    particle.getDevice(deviceId, function (err, device) {
 
         if (device != null) {
             device.callFunction('replay', "" + serialNo + ", " + generationId, function (err, data) {

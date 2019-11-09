@@ -3,10 +3,10 @@
 node_modules/
 .idea/
 .run.sh.swp
+.vscode
 ErabliWatchDog/
 log/
 pid/
-
 run.sh
 config.json
 ErabliWatchDog/CollecteurRestart.log

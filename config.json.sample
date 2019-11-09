@@ -1,5 +1,6 @@
 {
-  "accessToken": "place-token-here",
+  "username": "pierre.leboeuf@me.com",
+  "password": "JDH5uuQ44ozp",
   "port": 8150,
   "database": "raw_events.sqlite3",
   "streamTimeout": 660000,
