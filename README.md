@@ -24,6 +24,12 @@ Fill config.json with your access token from the Particle IDE.
 
     node app
 
+    in playback mode, two optional parameters
+        noStream:           Prevent connection to event stream
+        allDeviceReplay:    Replay all events from the raw database upon start
+
+    node app noStream allDeviceReplay 
+
 Then point your browser to http://localhost:8150/
 
 ## To run the tests:
