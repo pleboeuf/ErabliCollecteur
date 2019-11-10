@@ -1,0 +1,29 @@
+{
+  "username": "",
+  "password": "",
+  "port": 8150,
+  "database": "raw_events.sqlite3",
+  "streamTimeout": 660000,
+  "collectors": [
+    {
+      "uri": "ws://localhost:8151/"
+    }
+  ],
+  "blacklist": [
+    {
+      "device": "2f0024000647343339373536",
+      "timestampUntil": 1520889386019,
+      "reason": "Very large generation number and invalid event data."
+    },
+    {
+      "device": "36004f000251353337353037",
+      "timestampUntil": 1521484806868,
+      "reason": "Missing generation & serial"
+    },
+    {
+      "device": "2f0024000647343339373536",
+      "timestampUntil": 1520889386019,
+      "reason": "Missing generation & serial"
+    }
+  ]
+}
