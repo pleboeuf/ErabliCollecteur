@@ -2,7 +2,6 @@ const fs = require('fs');
 const Promise = require('promise');
 const readFile = Promise.denodeify(fs.readFile);
 const http = require('http');
-// const spark = require('spark');
 const Particle = require('particle-api-js');
 const sqlite3 = require('better-sqlite3');
 const express = require('express');

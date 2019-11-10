@@ -18,7 +18,7 @@ Assuming NPM is already installed:
 
     cp config.json.sample config.json
 
-Fill config.json with your access token from the Particle IDE.
+Fill config.json with your access credentials from the Particle IDE.
 
 ## 3. Run!
 

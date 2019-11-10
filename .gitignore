@@ -3,7 +3,7 @@
 node_modules/
 .idea/
 .run.sh.swp
-.vscode
+.vscode/
 ErabliWatchDog/
 log/
 pid/
