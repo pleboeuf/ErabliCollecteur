@@ -4,6 +4,7 @@ node_modules/
 .idea/
 .run.sh.swp
 .vscode/
+.vscode/launch.json
 ErabliWatchDog/
 log/
 pid/
