@@ -16,9 +16,9 @@ exports.EventDatabase = function (db) {
   this.handleEvent = function (event) {
     // var publishDate = new Date(event.published_at);
     const publishDate = event.published_at;
-    if (event.name.lastIndexOf("spark/", 0) != -1) {
-      console.warn("Spark event: " + JSON.stringify(event));
-      return
+    if (event.data.indexOf("noSerie", 0) == -1){
+      console.warn("Unknown event: " + JSON.stringify(event));
+      return;
     }
     try {
       var data = JSON.parse(event.data);
@@ -44,12 +44,14 @@ exports.EventDatabase = function (db) {
       self.insertAndNotify(event, event.coreid, undefined, undefined, publishDate, event.data);
     }
   };
+
   this.insertAndNotify = function (event, deviceId, generationId, serialNo, publishDate, data) {
     self.insertEvent(event.coreid, generationId, serialNo, publishDate, data);
     self.listeners.forEach(function (listener) {
       listener.call(listener, event);
     });
   };
+
   this.insertEvent = function (deviceId, generationId, serialNo, publishDate, rawData) {
     var sql = "INSERT INTO raw_events (device_id, published_at, generation_id, serial_no, raw_data) VALUES (?, ?, ?, ?, ?)";
     var prepared = db.prepare(sql);
@@ -65,6 +67,7 @@ exports.EventDatabase = function (db) {
       }
     });
   };
+
   this.containsEvent = function (deviceId, generationId, serialNo) {
     const sql = "select 1 from raw_events where device_id = ? and generation_id = ? and serial_no = ?";
     var prepared = db.prepare(sql);
@@ -79,6 +82,7 @@ exports.EventDatabase = function (db) {
       }
     });
   };
+
   this.onEvent = function (listener) {
     this.listeners.push(listener);
   };
