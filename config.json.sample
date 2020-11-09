@@ -6,7 +6,7 @@
   "streamTimeout": 660000,
   "collectors": [
     {
-      "uri": "ws://localhost:8151/"
+      "uri": "ws://localhost:8150/"
     }
   ],
   "blacklist": [
