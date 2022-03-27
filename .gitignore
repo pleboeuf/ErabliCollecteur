@@ -6,6 +6,7 @@ node_modules/
 .vscode/
 .vscode/launch.json
 .DS_Store
+.env
 ErabliWatchDog/
 log/
 pid/
