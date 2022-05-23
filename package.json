@@ -10,7 +10,7 @@
     "better-sqlite3": "^7.5.0",
     "chalk": "",
     "express": "^4.17.2",
-    "hawk": "^7.0.10",
+    "hawk": "^9.0.1",
     "integer": "^2.1.0",
     "mime": "^2.4.0",
     "node-gyp": "^8.2.0",
