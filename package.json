@@ -9,7 +9,7 @@
     "@hapi/cryptiles": "^5.1.0",
     "better-sqlite3": "^7.5.0",
     "chalk": "",
-    "express": "^4.17.2",
+    "express": "^4.17.3",
     "hawk": "^9.0.1",
     "integer": "^2.1.0",
     "mime": "^2.4.0",
