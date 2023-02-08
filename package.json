@@ -9,6 +9,7 @@
     "@hapi/cryptiles": "^5.1.0",
     "better-sqlite3": "^7.5.0",
     "chalk": "",
+    "dotenv": "^16.0.3",
     "express": "^4.17.2",
     "hawk": "^9.0.1",
     "integer": "^2.1.0",
