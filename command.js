@@ -3,7 +3,8 @@ exports.CommandHandler = function (db, blacklist) {
         const blacklisted = blacklist.find(function (black) {
             return (
                 (!black.device || black.device === row.device_id) &&
-                (!black.timestampUntil || black.timestampUntil < row.published_at)
+                (!black.timestampUntil ||
+                    black.timestampUntil < row.published_at)
             );
         });
         if (blacklisted) {
@@ -13,18 +14,22 @@ exports.CommandHandler = function (db, blacklist) {
     }
 
     function handleQuery(command, connection) {
-        const hasDeviceParam = (typeof command.device !== "undefined");
-        const hasGenerationParam = (typeof command.generation !== "undefined");
-        const hasAfterParam = (typeof command.after !== "undefined");
+        const hasDeviceParam = typeof command.device !== "undefined";
+        const hasGenerationParam = typeof command.generation !== "undefined";
+        const hasAfterParam = typeof command.after !== "undefined";
         if (hasAfterParam && !hasDeviceParam) {
-            connection.send(JSON.stringify({
-                "error": "parameter 'device' is mandatory with 'after' parameter"
-            }));
+            connection.send(
+                JSON.stringify({
+                    error: "parameter 'device' is mandatory with 'after' parameter",
+                })
+            );
         }
         if (hasAfterParam && !hasGenerationParam) {
-            connection.send(JSON.stringify({
-                "error": "parameter 'generation' is mandatory with 'after' parameter"
-            }));
+            connection.send(
+                JSON.stringify({
+                    error: "parameter 'generation' is mandatory with 'after' parameter",
+                })
+            );
         }
         var sql = "select * from raw_events";
         var params = [];
@@ -48,13 +53,15 @@ exports.CommandHandler = function (db, blacklist) {
 
         function doneSending() {
             console.log("Completed.", command);
-            connection.send(JSON.stringify({
-                name: "collector/querycomplete",
-                data: {
-                    command: command,
-                    sql: sql
-                }
-            }));
+            connection.send(
+                JSON.stringify({
+                    name: "collector/querycomplete",
+                    data: {
+                        command: command,
+                        sql: sql,
+                    },
+                })
+            );
         }
 
         function sendNext() {
@@ -68,7 +75,10 @@ exports.CommandHandler = function (db, blacklist) {
             if (isBlacklisted(row)) {
                 // Ignore
                 sendNext();
-            } else if (row.published_at === null || row.generation_id === null) {
+            } else if (
+                row.published_at === null ||
+                row.generation_id === null
+            ) {
                 // console.log("Skipping invalid row", row);
                 sendNext();
             } else {
@@ -77,10 +87,10 @@ exports.CommandHandler = function (db, blacklist) {
                     data.generation = row.generation_id;
                     data.noSerie = row.serial_no;
                     const event = {
-                        "coreid": row.device_id,
-                        "published_at": new Date(row.published_at),
-                        "name": data.eName,
-                        "data": JSON.stringify(data)
+                        coreid: row.device_id,
+                        published_at: new Date(row.published_at),
+                        name: data.eName,
+                        data: JSON.stringify(data),
                         // "context": {command: command, sql: sql, row: row}
                     };
                     command.sent += 1;
@@ -91,7 +101,6 @@ exports.CommandHandler = function (db, blacklist) {
                     console.log("Error", error);
                     sendNext();
                 }
-
             }
         }
 
@@ -100,20 +109,22 @@ exports.CommandHandler = function (db, blacklist) {
 
     return {
         // format: { "command" : "query", "device": "device-id", "generation" : 0, "after": 0 }
-        "onCommand": function (command, connection) {
+        onCommand: function (command, connection) {
             if (command.command === "subscribe") {
                 connection.subscribed = true;
             } else if (command.command === "query") {
                 handleQuery(command, connection);
             } else {
-                connection.send(JSON.stringify({
-                    name: "collector/error",
-                    data: {
-                        message: "command not supported",
-                        command: command
-                    }
-                }));
+                connection.send(
+                    JSON.stringify({
+                        name: "collector/error",
+                        data: {
+                            message: "command not supported",
+                            command: command,
+                        },
+                    })
+                );
             }
-        }
+        },
     };
 };
