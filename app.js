@@ -8,7 +8,6 @@ const sqlite3 = require("better-sqlite3");
 const express = require("express");
 const path = require("path");
 const chalk = require("chalk");
-// const Watchout = require('watchout')
 const Command = require("./command.js");
 const WebSocket = require("ws");
 const eventmodule = require("./event.js");
