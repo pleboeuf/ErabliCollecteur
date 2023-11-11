@@ -1,29 +1,23 @@
 {
-  "username": "",
-  "password": "",
-  "port": 8150,
-  "database": "raw_events.sqlite3",
-  "streamTimeout": 660000,
-  "collectors": [
-    {
-      "uri": "ws://localhost:8150/"
-    }
-  ],
-  "blacklist": [
-    {
-      "device": "2f0024000647343339373536",
-      "timestampUntil": 1520889386019,
-      "reason": "Very large generation number and invalid event data."
+    "port": 8150,
+    "database": "raw_events.sqlite3",
+    "streamTimeout": 660000,
+    "collectors": [
+        {
+            "uri": "ws://localhost:8150/"
+        }
+    ],
+    "mariadb": {
+        "host": "servername.local",
+        "username": "",
+        "password": "",
+        "database": "RawData_2022"
     },
-    {
-      "device": "36004f000251353337353037",
-      "timestampUntil": 1521484806868,
-      "reason": "Missing generation & serial"
-    },
-    {
-      "device": "2f0024000647343339373536",
-      "timestampUntil": 1520889386019,
-      "reason": "Missing generation & serial"
-    }
-  ]
+    "blacklist": [
+        {
+            "device": "36004f000251353337353037",
+            "timestampUntil": 1521484806868,
+            "reason": "Missing generation & serial"
+        }
+    ]
 }
