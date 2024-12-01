@@ -7,7 +7,7 @@
     },
     "dependencies": {
         "@hapi/cryptiles": "^5.1.0",
-        "better-sqlite3": "^7.6.2",
+        "better-sqlite3": "^11.6.0",
         "chalk": "^4.1.2",
         "dotenv": "^16.3.1",
         "express": "^4.18.2",
@@ -21,6 +21,6 @@
         "ws": "^6.2.2"
     },
     "engines": {
-        "node": ">= 14.19.0"
+        "node": ">= 22.11.0"
     }
 }
