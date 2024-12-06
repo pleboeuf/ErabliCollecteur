@@ -9,7 +9,7 @@ User=erabliere
 Group=erabliere
 WorkingDirectory=/home/erabliere/ErabliCollecteur
 PIDFile=/home/erabliere/ErabliCollecteur/pid/app.pid
-ExecStart=/home/erabliere/.nvm/versions/node/v14.21.3/bin/node /home/erabliere/ErabliCollecteur/app.js
+ExecStart=/home/erabliere/.nvm/versions/node/v22.11.0/bin/node /home/erabliere/ErabliCollecteur/app.js
 Restart=on-abnormal
 TimeoutSec=15
 
