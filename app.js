@@ -150,21 +150,64 @@ function connectToParticleCloud(db, eventDB, streamOption, replayOption) {
 
 function openStream(db, eventDB) {
     console.log(chalk.gray("Connecting to event stream."));
-    particle
-        .getEventStream({ deviceId: "mine", auth: accessToken })
-        .then(function (stream) {
-            stream.on("event", function (event) {
-                console.log("Event: ", event);
-                if (event.code == "ETIMEDOUT") {
-                    console.error(chalk.red(Date() + " Timeout error"));
-                } else {
-                    eventDB.handleEvent(event);
-                }
+    let retryCount = 0;
+    const maxRetries = 10; // Example: retry up to 10 times
+    const initialDelay = 1000; // 1 second
+
+    function connect() {
+        particle
+            .getEventStream({ deviceId: "mine", auth: accessToken })
+            .then(function (stream) {
+                console.log(chalk.green("Event stream connected."));
+                retryCount = 0; // Reset retry count on successful connection
+
+                stream.on("event", function (event) {
+                    console.log("Event: ", event);
+                    if (event.code == "ETIMEDOUT") {
+                        console.error(chalk.red(Date() + " Timeout error"));
+                    } else {
+                        eventDB.handleEvent(event);
+                    }
+                });
+
+                stream.on("close", () => {
+                    console.warn(chalk.yellow("Event stream closed."));
+                    reconnect();
+                });
+
+                stream.on("error", (err) => {
+                    console.error(chalk.red("Event stream error:"), err);
+                    reconnect();
+                });
+            })
+            .catch(function (err) {
+                console.error(chalk.red("Stream failed: %s"), err);
+                reconnect();
             });
-        })
-        .catch(function (err) {
-            console.log(chalk.red("Stream failed: %s"), err);
-        });
+    }
+
+    function reconnect() {
+        if (retryCount < maxRetries) {
+            retryCount++;
+            const delay = initialDelay * Math.pow(2, retryCount - 1); // Exponential backoff
+            console.warn(
+                chalk.yellow(
+                    `Attempting to reconnect in ${
+                        delay / 1000
+                    } seconds (attempt ${retryCount}/${maxRetries})...`
+                )
+            );
+            setTimeout(connect, delay);
+        } else {
+            console.error(
+                chalk.red(
+                    `Max reconnection attempts (${maxRetries}) reached. Giving up.`
+                )
+            );
+        }
+    }
+
+    connect(); // Initial connection attempt
 }
 
 function requestAllDeviceReplay(db) {
