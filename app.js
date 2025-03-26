@@ -153,16 +153,37 @@ function openStream(db, eventDB) {
     let retryCount = 0;
     const maxRetries = 10; // Example: retry up to 10 times
     const initialDelay = 1000; // 1 second
+    let stream = null;
+    let watchdogTimer = null;
+    const watchdogTimeout = 4 * 60 * 1000; // 4 minutes in milliseconds
+
+    function resetWatchdog() {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = setTimeout(() => {
+            console.warn(
+                chalk.yellow(
+                    "Watchdog: No event received for 4 minutes. Reconnecting stream."
+                )
+            );
+            if (stream) {
+                stream.close();
+            }
+            reconnect();
+        }, watchdogTimeout);
+    }
 
     function connect() {
         particle
             .getEventStream({ deviceId: "mine", auth: accessToken })
-            .then(function (stream) {
+            .then(function (newStream) {
+                stream = newStream;
                 console.log(chalk.green("Event stream connected."));
                 retryCount = 0; // Reset retry count on successful connection
+                resetWatchdog();
 
                 stream.on("event", function (event) {
                     console.log("Event: ", event);
+                    resetWatchdog();
                     if (event.code == "ETIMEDOUT") {
                         console.error(chalk.red(Date() + " Timeout error"));
                     } else {
