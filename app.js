@@ -74,8 +74,6 @@ function createDatabase(schema) {
 
 function createExpressApp() {
     var app = express();
-    // app.use(app.router);
-    // app.use(express.logger());
     app.use(express.static(path.join(__dirname, "public")));
     app.use("/", express.static(path.join(__dirname, "index.html")));
     app.get("/device/:id", function (req, res) {
@@ -150,27 +148,10 @@ function connectToParticleCloud(db, eventDB, streamOption, replayOption) {
 
 function openStream(db, eventDB) {
     console.log(chalk.gray("Connecting to event stream."));
-    let retryCount = 0;
-    const maxRetries = 10; // Example: retry up to 10 times
     const initialDelay = 1000; // 1 second
     let stream = null;
     let watchdogTimer = null;
     const watchdogTimeout = 4 * 60 * 1000; // 4 minutes in milliseconds
-
-    function resetWatchdog() {
-        clearTimeout(watchdogTimer);
-        watchdogTimer = setTimeout(() => {
-            console.warn(
-                chalk.yellow(
-                    "Watchdog: No event received for 4 minutes. Reconnecting stream."
-                )
-            );
-            if (stream) {
-                stream.close();
-            }
-            reconnect();
-        }, watchdogTimeout);
-    }
 
     function connect() {
         particle
@@ -178,12 +159,9 @@ function openStream(db, eventDB) {
             .then(function (newStream) {
                 stream = newStream;
                 console.log(chalk.green("Event stream connected."));
-                retryCount = 0; // Reset retry count on successful connection
-                resetWatchdog();
 
                 stream.on("event", function (event) {
                     console.log("Event: ", event);
-                    resetWatchdog();
                     if (event.code == "ETIMEDOUT") {
                         console.error(chalk.red(Date() + " Timeout error"));
                     } else {
@@ -193,39 +171,15 @@ function openStream(db, eventDB) {
 
                 stream.on("close", () => {
                     console.warn(chalk.yellow("Event stream closed."));
-                    reconnect();
                 });
 
                 stream.on("error", (err) => {
                     console.error(chalk.red("Event stream error:"), err);
-                    reconnect();
                 });
             })
             .catch(function (err) {
                 console.error(chalk.red("Stream failed: %s"), err);
-                reconnect();
             });
-    }
-
-    function reconnect() {
-        if (retryCount < maxRetries) {
-            retryCount++;
-            const delay = initialDelay * Math.pow(2, retryCount - 1); // Exponential backoff
-            console.warn(
-                chalk.yellow(
-                    `Attempting to reconnect in ${
-                        delay / 1000
-                    } seconds (attempt ${retryCount}/${maxRetries})...`
-                )
-            );
-            setTimeout(connect, delay);
-        } else {
-            console.error(
-                chalk.red(
-                    `Max reconnection attempts (${maxRetries}) reached. Giving up.`
-                )
-            );
-        }
     }
 
     connect(); // Initial connection attempt
@@ -376,8 +330,24 @@ function createWebSocketServer(server, eventDB, commandHandler) {
 
     eventDB.onEvent(function (event) {
         connectedClients.forEach(function (connection) {
-            if (connection.subscribed) {
-                connection.send(JSON.stringify(event));
+            try {
+                if (connection.subscribed) {
+                    connection.send(JSON.stringify(event));
+                }
+            } catch (err) {
+                console.log(
+                    chalk.gray(
+                        new Date() +
+                            " Peer " +
+                            connection.remoteAddress +
+                            " disconnected. Connections: " +
+                            connectedClients.length
+                    )
+                );
+                connectedClients.splice(
+                    connectedClients.indexOf(connection),
+                    1
+                );
             }
         });
     });
