@@ -14,7 +14,7 @@
         "hawk": "^9.0.1",
         "integer": "^2.1.0",
         "mime": "^2.6.0",
-        "node-gyp": "^8.4.1",
+        "node-gyp": "^12.1.0",
         "particle-api-js": "^9.1.2",
         "promise": "^8.3.0",
         "sshpk": "^1.18.0",
