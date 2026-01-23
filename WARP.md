@@ -4,10 +4,52 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ## Overview
 
-ErabliCollecteur is a Node.js application that collects raw sensor data from Particle IoT devices. 
+ErabliCollecteur is a Node.js application that collects raw sensor data from Particle IoT devices.
 It connects to the Particle Cloud, listens for events from registered devices, and stores them in a SQLite database. 
 A web server and WebSocket interface allows clients to query historical data and subscribe to real-time events.
-ErabliCollecteur is one component of a data acquisition system consisting of three applications. The two other are ErabliDash and ErabliExport.
+
+## System Architecture
+
+ErabliCollecteur is the data ingestion component of a three-part IoT data acquisition system:
+
+**1. ErabliCollecteur (this application)** - Data Collection Layer
+- Connects to Particle Cloud and receives raw sensor events from IoT devices
+- Stores raw events in SQLite database (raw_events.sqlite3)
+- Exposes WebSocket server (default port: 8150) for real-time event streaming
+- Provides HTTP REST API for historical data queries
+- Acts as the central event hub that downstream applications connect to
+
+**2. ErabliDash** - Data Visualization Layer
+- Connects to ErabliCollecteur via WebSocket client (ws://localhost:8150/)
+- Queries historical data on startup, then subscribes to real-time events
+- Processes raw sensor data into human-readable dashboard metrics
+- Serves web dashboard (default port: 3300) with live updates
+- Broadcasts processed data to browser clients via its own WebSocket server
+
+**3. ErabliExport** - Data Persistence & Export Layer
+- Connects to ErabliCollecteur via WebSocket client (ws://localhost:8150/)
+- Queries historical data on startup, then subscribes to real-time events
+- Processes and stores sensor readings in normalized SQLite tables (pumps, cycles, coulee)
+- Exports data to InfluxDB time-series database for long-term analytics
+- Provides web interface (default port: 3003) for CSV exports
+
+### Data Flow Between Components
+
+```
+Particle Cloud
+     ↓
+ErabliCollecteur (port 8150)
+  │
+  ├─→ WebSocket stream → ErabliDash (port 3300) → Browser clients
+  │
+  └─→ WebSocket stream → ErabliExport (port 3003) → InfluxDB
+```
+
+Both ErabliDash and ErabliExport:
+1. Send `{"command": "query", ...}` to retrieve historical events on startup
+2. Send `{"command": "subscribe"}` to receive real-time events
+3. Automatically reconnect if connection drops
+4. Process the same raw event stream but for different purposes (visualization vs. persistence)
 
 ## Architecture
 
@@ -162,3 +204,69 @@ Query completion:
 
 ### Node.js Version
 Requires Node.js >= 22.11.0 (specified in package.json engines)
+
+## Integration with Other Components
+
+### ErabliDash Integration
+ErabliDash connects to ErabliCollecteur as a WebSocket client using the `websocket` npm package. Configure the collector URI in ErabliDash's config.json:
+```json
+{
+  "collectors": [{"uri": "ws://localhost:8150/"}]
+}
+```
+
+On startup, ErabliDash:
+1. Connects to ErabliCollecteur's WebSocket server
+2. Sends query commands to fetch historical events from the last known state
+3. Waits for `collector/querycomplete` event
+4. Subscribes to real-time events
+5. Transforms raw events into dashboard-specific data structures
+6. Serves processed data to browser clients on port 3300
+
+### ErabliExport Integration
+ErabliExport also connects as a WebSocket client with similar flow to ErabliDash. Configure in ErabliExport's config.json:
+```json
+{
+  "collectors": [{"uri": "ws://localhost:8150/"}],
+  "dashboardConfig": {"filename": "../ErabliDash/config.json"}
+}
+```
+
+On startup, ErabliExport:
+1. Loads ErabliDash's configuration to access device definitions
+2. Connects to ErabliCollecteur's WebSocket server
+3. Queries historical events from last processed state
+4. Subscribes to real-time events after query completion
+5. Processes events into normalized database tables (pumps, cycles, coulee)
+6. Exports processed data to InfluxDB at configured intervals
+
+Note: ErabliExport can run in playback mode (`node app playbackOnly`) to process historical data without subscribing to real-time events.
+
+## Deployment Considerations
+
+### Typical Deployment Topology
+For production deployments, all three components typically run on the same host:
+- ErabliCollecteur runs as a systemd service (ErabliCollecteur.service)
+- ErabliDash and ErabliExport run as separate services or containers
+- All three share localhost networking (ws://localhost:8150)
+
+### Docker Deployment
+When deploying with Docker, use container linking or Docker Compose networking:
+```bash
+# Start collector
+docker run -d --name erablicollecteur -p 8150:8150 elecnix/erablicollecteur
+
+# Link dash to collector
+docker run -d --name erablidash -p 3300:3300 --link erablicollecteur:erablicollecteur elecnix/erablidash
+
+# Link export to collector
+docker run -d --name erabliexport -p 3003:3003 --link erablicollecteur:erablicollecteur elecnix/erabliexport
+```
+
+When using Docker links, set the collector hostname in downstream configs to the container name (e.g., `ws://erablicollecteur:8150/`).
+
+### High Availability Notes
+- ErabliCollecteur is the single point of failure - if it goes down, both downstream components will attempt reconnection
+- Raw events are persisted in SQLite before broadcasting, ensuring no data loss if downstream components are offline
+- Downstream components automatically reconnect and query missing events on reconnection
+- Each component maintains its own state file (dashboard.json for ErabliDash) to track last processed event
