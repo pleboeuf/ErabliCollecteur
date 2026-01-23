@@ -118,7 +118,7 @@ function startApp(db) {
 
     // Start Datacer fetcher if endpoint is configured
     if (process.env.ENDPOINT_VAC) {
-        datacerFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_VAC);
+        datacerFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_VAC, db);
         datacerFetcher.start();
     } else {
         console.log(

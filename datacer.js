@@ -4,23 +4,90 @@ const chalk = require("chalk");
  * DatacerFetcher - Fetches vacuum data from Datacer API and formats it as events
  */
 class DatacerFetcher {
-    constructor(eventDB, datacerEndpoint) {
+    constructor(eventDB, datacerEndpoint, db) {
         this.eventDB = eventDB;
         this.datacerEndpoint = datacerEndpoint;
+        this.db = db;
         this.intervalId = null;
         this.generationId = 0; // Datacer generation counter
         this.serialNo = 0; // Sequential event number
+        this.initialized = false;
+    }
+
+    /**
+     * Initialize generation and serial numbers from database
+     */
+    async initialize() {
+        try {
+            const sql = `
+                SELECT generation_id, serial_no 
+                FROM raw_events 
+                WHERE device_id = 'DATACER' 
+                ORDER BY generation_id DESC, serial_no DESC 
+                LIMIT 1
+            `;
+            const row = this.db.prepare(sql).get();
+            
+            if (row) {
+                // Check if this is from a previous run (generation ID is a past timestamp)
+                const currentTimestamp = Math.floor(Date.now() / 1000);
+                const lastGeneration = row.generation_id;
+                
+                // If last generation is more than 5 minutes old, start a new generation
+                // Otherwise, resume the current generation
+                if (currentTimestamp - lastGeneration > 300) {
+                    // New generation (new run after significant downtime)
+                    this.generationId = currentTimestamp;
+                    this.serialNo = 0;
+                    console.log(
+                        chalk.gray(
+                            `Datacer starting new generation ${this.generationId} (previous: ${lastGeneration})`
+                        )
+                    );
+                } else {
+                    // Resume current generation (restart within 5 minutes)
+                    this.generationId = lastGeneration;
+                    this.serialNo = row.serial_no;
+                    console.log(
+                        chalk.gray(
+                            `Datacer resuming generation ${this.generationId} from serial ${this.serialNo}`
+                        )
+                    );
+                }
+            } else {
+                // First run - use current timestamp as generation ID
+                this.generationId = Math.floor(Date.now() / 1000);
+                this.serialNo = 0;
+                console.log(
+                    chalk.gray(
+                        `No previous Datacer events found. Starting generation ${this.generationId}`
+                    )
+                );
+            }
+            this.initialized = true;
+        } catch (error) {
+            console.error(
+                chalk.red(`Failed to initialize Datacer state: ${error.message}`)
+            );
+            // Fallback to timestamp-based generation
+            this.generationId = Math.floor(Date.now() / 1000);
+            this.serialNo = 0;
+            this.initialized = true;
+        }
     }
 
     /**
      * Start polling Datacer API every minute
      */
-    start() {
+    async start() {
         console.log(
             chalk.gray(
                 `Starting Datacer polling from ${this.datacerEndpoint} every 60 seconds`
             )
         );
+
+        // Initialize from database first
+        await this.initialize();
 
         // Fetch immediately on start
         this.fetchAndEmit();
@@ -79,7 +146,7 @@ class DatacerFetcher {
      * Normalize label (e.g., "EB-V01" -> "EB-V1")
      */
     normalizeLabel(label) {
-        return label.replace(/([A-Z])0*/, "$1");
+        return label.replace(/([A-Z])(0+)(\d+)/g, "$1$3");
     }
 
     /**
