@@ -14,6 +14,7 @@ ErabliCollecteur is the data ingestion component of a three-part IoT data acquis
 
 **1. ErabliCollecteur (this application)** - Data Collection Layer
 - Connects to Particle Cloud and receives raw sensor events from IoT devices
+- Polls Datacer API every 60 seconds to fetch vacuum line data and emits as synthetic events
 - Stores raw events in SQLite database (raw_events.sqlite3)
 - Exposes WebSocket server (default port: 8150) for real-time event streaming
 - Provides HTTP REST API for historical data queries
@@ -36,13 +37,13 @@ ErabliCollecteur is the data ingestion component of a three-part IoT data acquis
 ### Data Flow Between Components
 
 ```
-Particle Cloud
-     ↓
-ErabliCollecteur (port 8150)
-  │
-  ├─→ WebSocket stream → ErabliDash (port 3300) → Browser clients
-  │
-  └─→ WebSocket stream → ErabliExport (port 3003) → InfluxDB
+Particle Cloud ──┐
+                 ↓
+Datacer API   → ErabliCollecteur (port 8150)
+                  │
+                  ├─→ WebSocket stream → ErabliDash (port 3300) → Browser clients
+                  │
+                  └─→ WebSocket stream → ErabliExport (port 3003) → InfluxDB
 ```
 
 Both ErabliDash and ErabliExport:
@@ -57,6 +58,7 @@ Both ErabliDash and ErabliExport:
 
 **app.js** - Main application entry point
 - Connects to Particle Cloud using credentials from environment variables (PARTICLE_USER, PARTICLE_TOKEN)
+- Initializes Datacer fetcher if ENDPOINT_VAC is configured
 - Manages SQLite database lifecycle (creation, connections, graceful shutdown)
 - Runs Express HTTP server (default port: 8150)
 - Manages WebSocket server for real-time event streaming
@@ -76,11 +78,21 @@ Both ErabliDash and ErabliExport:
 - Implements blacklist filtering based on config.json
 - Opens read-only database connections per query (closed after query completion)
 
+**datacer.js** - DatacerFetcher class
+- Polls Datacer API every 60 seconds for vacuum line data (configurable via ENDPOINT_VAC)
+- Transforms Datacer vacuum readings into synthetic Particle-like events
+- Emits events with 100ms delay between each to avoid saturating downstream modules
+- Uses virtual device ID "DATACER" for all Datacer events
+- Updates device name to reflect the current vacuum device being processed (e.g., "G9-G10")
+- Normalizes sensor labels (e.g., "EB-V01" → "EB-V1")
+- Manages its own generation and serial number sequence
+
 ### Data Flow
 
 1. **Particle Cloud → EventDatabase**: Events arrive via Particle stream → validated → deduplicated → inserted to database → broadcast to subscribed WebSocket clients
-2. **Client → WebSocket Server**: Clients send JSON commands ("query" or "subscribe") → CommandHandler executes queries → results streamed back as JSON events
-3. **HTTP Endpoint**: GET `/device/:id?generation=X&since=Y` returns historical events as JSON array
+2. **Datacer API → EventDatabase**: DatacerFetcher polls every 60s → transforms to synthetic events → passes through EventDatabase (with 100ms delays) → stored and broadcast like regular events
+3. **Client → WebSocket Server**: Clients send JSON commands ("query" or "subscribe") → CommandHandler executes queries → results streamed back as JSON events
+4. **HTTP Endpoint**: GET `/device/:id?generation=X&since=Y` returns historical events as JSON array
 
 ### Database Schema
 
@@ -104,6 +116,7 @@ SQLite table `raw_events`:
 **Environment variables** (.env):
 - PARTICLE_USER: Particle Cloud account email
 - PARTICLE_TOKEN: Particle Cloud access token (not password)
+- ENDPOINT_VAC: Datacer API endpoint for vacuum data (optional, e.g., https://da1222.base.datacer.online/vacuum)
 - DB_HOST, DB_USER, DB_PASSWORD, DB_DB: Optional MariaDB credentials
 
 ## Development Commands
@@ -169,10 +182,11 @@ sudo systemctl status ErabliCollecteur.service
 ### Graceful Shutdown
 Application responds to SIGTERM/SIGINT by:
 1. Clearing inactivity timer
-2. Closing Particle event stream
-3. Closing WebSocket server
-4. Closing database connection
-5. Exiting with code 0
+2. Stopping Datacer fetcher polling
+3. Closing Particle event stream
+4. Closing WebSocket server
+5. Closing database connection
+6. Exiting with code 0
 
 ### Event Deduplication
 Events are uniquely identified by (device_id, generation_id, serial_no). Duplicates are logged but not stored. Non-replay duplicates trigger warnings about possible data loss.

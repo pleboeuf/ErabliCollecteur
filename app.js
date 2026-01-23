@@ -11,6 +11,7 @@ const chalk = require("chalk");
 const Command = require("./command.js");
 const WebSocket = require("ws");
 const eventmodule = require("./event.js");
+const { DatacerFetcher } = require("./datacer.js");
 const config = require("./config.json");
 const dbFile = config.database || "raw_events.sqlite3";
 const particle = new Particle();
@@ -26,6 +27,7 @@ const INACTIVITY_TIMEOUT_MS = 150 * 1000; // 150 seconds
 let mainDbConnection = null; // Keep a reference to the main DB connection
 let webSocketServer = null; // Keep a reference to the WebSocket server
 let particleStream = null; // Keep a reference to the Particle stream
+let datacerFetcher = null; // Keep a reference to the Datacer fetcher
 // --- End Added ---
 
 function devString(deviceId) {
@@ -41,6 +43,13 @@ function shutdown(reason) {
     if (inactivityTimer) {
         clearTimeout(inactivityTimer);
         inactivityTimer = null;
+    }
+
+    // Stop Datacer Fetcher if it exists
+    if (datacerFetcher) {
+        console.log(chalk.gray("Stopping Datacer fetcher..."));
+        datacerFetcher.stop();
+        datacerFetcher = null;
     }
 
     // Close Particle Stream if it exists
@@ -106,6 +115,18 @@ function startApp(db) {
     mainDbConnection = db; // Store the main DB connection
     eventDB = new eventmodule.EventDatabase(db);
     const app = createExpressApp(db); // Pass db here if needed, though the route handler reopens it
+
+    // Start Datacer fetcher if endpoint is configured
+    if (process.env.ENDPOINT_VAC) {
+        datacerFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_VAC);
+        datacerFetcher.start();
+    } else {
+        console.log(
+            chalk.yellow(
+                "ENDPOINT_VAC not configured. Datacer polling disabled."
+            )
+        );
+    }
 
     // Do not connect to Particle cloud for playbackOnly
     // Pass the shutdown function down
