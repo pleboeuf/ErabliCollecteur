@@ -7,12 +7,6 @@
             "uri": "ws://localhost:8150/"
         }
     ],
-    "mariadb": {
-        "host": "servername.local",
-        "username": "",
-        "password": "",
-        "database": "RawData_2022"
-    },
     "blacklist": [
         {
             "device": "36004f000251353337353037",

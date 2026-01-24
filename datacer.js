@@ -193,17 +193,13 @@ class DatacerFetcher {
     createSyntheticEvent(vacuumItem) {
         this.serialNo++;
 
-        // Normalize the label (remove leading zeros)
-        const normalizedLabel = this.normalizeLabel(vacuumItem.label);
-
         // Use the device name from Datacer as the device ID for better logging
-        // This will show as "G9-G10 (DATACER)" in logs instead of "? (DATACER-VACUUM-001)"
-        const deviceId = "DATACER";
-        const deviceName = vacuumItem.device;
+        // This will show as "A1 (A1-A2)" in logs where A1 is the label and A1-A2 is the device
+        const deviceId = vacuumItem.device;
+        const deviceName = this.normalizeLabel(vacuumItem.label); // Use label instead of device name
 
-        // Update device attributes with current device name
-        // Since all Datacer events share the same ID, the name will reflect the last processed device
-        // But each event will show the correct device name when logged
+        // Update device attributes with label as the display name
+        // This makes the logs show "label (device)" format, e.g., "A1 (A1-A2)"
         this.eventDB.setAttributes(deviceId, {
             id: deviceId,
             name: deviceName,
@@ -219,23 +215,22 @@ class DatacerFetcher {
             percentCharge: parseFloat(vacuumItem.percentCharge) || 0,
             offset: vacuumItem.offset || 0,
             device: vacuumItem.device,
-            label: vacuumItem.label,
-            normalizedLabel: normalizedLabel,
+            label: this.normalizeLabel(vacuumItem.label),
             lastUpdatedAt: vacuumItem.lastUpdatedAt,
-            eName: "Vacuum/Datacer", // Event name to identify Datacer events
+            eName: "Vacuum/Lignes", // Event name to identify Datacer events
         };
 
         // Add runtime info for specific devices
-        if (["EB-V1", "EB-V2", "EB-V3"].includes(vacuumItem.device)) {
-            eventData.RunTimeSinceMaint = vacuumItem.RunTimeSinceMaint;
-            eventData.NeedMaintenance = vacuumItem.NeedMaintenance;
-        }
+        // if (["EB-V1", "EB-V2", "EB-V3"].includes(vacuumItem.device)) {
+        //     eventData.RunTimeSinceMaint = vacuumItem.RunTimeSinceMaint;
+        //     eventData.NeedMaintenance = vacuumItem.NeedMaintenance;
+        // }
 
         // Create Particle-like event structure
         return {
             coreid: deviceId, // Use "DATACER" as device ID
             published_at: new Date().toISOString(),
-            name: "Vacuum/Datacer",
+            name: this.normalizeLabel(vacuumItem.label), // Use sensor label (e.g., "EB-V1") instead of device ID
             data: JSON.stringify(eventData),
             upstream: false, // Mark as local/synthetic event
         };
