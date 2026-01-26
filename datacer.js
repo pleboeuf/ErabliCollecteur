@@ -150,6 +150,17 @@ class DatacerFetcher {
     }
 
     /**
+     * Normalize device name (temporary fix for non-standard naming)
+     * e.g., "H-11-12-13" -> "H11-H12-H13"
+     */
+    normalizeDeviceName(deviceName) {
+        if (deviceName === "H-11-12-13") {
+            return "H11-H12-H13";
+        }
+        return deviceName;
+    }
+
+    /**
      * Fetch Datacer data and emit as synthetic events with delays
      */
     async fetchAndEmit() {
@@ -195,7 +206,7 @@ class DatacerFetcher {
 
         // Use the device name from Datacer as the device ID for better logging
         // This will show as "A1 (A1-A2)" in logs where A1 is the label and A1-A2 is the device
-        const deviceId = vacuumItem.device;
+        const deviceId = this.normalizeDeviceName(vacuumItem.device);
         const deviceName = this.normalizeLabel(vacuumItem.label); // Use label instead of device name
 
         // Update device attributes with label as the display name
@@ -214,7 +225,7 @@ class DatacerFetcher {
             ref: parseFloat(vacuumItem.referencialValue) || 0,
             percentCharge: parseFloat(vacuumItem.percentCharge) || 0,
             offset: vacuumItem.offset || 0,
-            device: vacuumItem.device,
+            device: this.normalizeDeviceName(vacuumItem.device),
             label: this.normalizeLabel(vacuumItem.label),
             lastUpdatedAt: vacuumItem.lastUpdatedAt,
             eName: "Vacuum/Lignes", // Event name to identify Datacer events
