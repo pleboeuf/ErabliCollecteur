@@ -27,12 +27,12 @@ class DatacerFetcher {
                 LIMIT 1
             `;
             const row = this.db.prepare(sql).get();
-            
+
             if (row) {
                 // Check if this is from a previous run (generation ID is a past timestamp)
                 const currentTimestamp = Math.floor(Date.now() / 1000);
                 const lastGeneration = row.generation_id;
-                
+
                 // If last generation is more than 5 minutes old, start a new generation
                 // Otherwise, resume the current generation
                 if (currentTimestamp - lastGeneration > 300) {
@@ -41,8 +41,8 @@ class DatacerFetcher {
                     this.serialNo = 0;
                     console.log(
                         chalk.gray(
-                            `Datacer starting new generation ${this.generationId} (previous: ${lastGeneration})`
-                        )
+                            `Datacer starting new generation ${this.generationId} (previous: ${lastGeneration})`,
+                        ),
                     );
                 } else {
                     // Resume current generation (restart within 5 minutes)
@@ -50,8 +50,8 @@ class DatacerFetcher {
                     this.serialNo = row.serial_no;
                     console.log(
                         chalk.gray(
-                            `Datacer resuming generation ${this.generationId} from serial ${this.serialNo}`
-                        )
+                            `Datacer resuming generation ${this.generationId} from serial ${this.serialNo}`,
+                        ),
                     );
                 }
             } else {
@@ -60,14 +60,16 @@ class DatacerFetcher {
                 this.serialNo = 0;
                 console.log(
                     chalk.gray(
-                        `No previous Datacer events found. Starting generation ${this.generationId}`
-                    )
+                        `No previous Datacer events found. Starting generation ${this.generationId}`,
+                    ),
                 );
             }
             this.initialized = true;
         } catch (error) {
             console.error(
-                chalk.red(`Failed to initialize Datacer state: ${error.message}`)
+                chalk.red(
+                    `Failed to initialize Datacer state: ${error.message}`,
+                ),
             );
             // Fallback to timestamp-based generation
             this.generationId = Math.floor(Date.now() / 1000);
@@ -82,8 +84,8 @@ class DatacerFetcher {
     async start() {
         console.log(
             chalk.gray(
-                `Starting Datacer polling from ${this.datacerEndpoint} every 60 seconds`
-            )
+                `Starting Datacer polling from ${this.datacerEndpoint} every 60 seconds`,
+            ),
         );
 
         // Initialize from database first
@@ -122,10 +124,8 @@ class DatacerFetcher {
     async fetchDatacerData() {
         try {
             // Use dynamic import for node-fetch
-            const fetch = (
-                await import("node-fetch")
-            ).default;
-            
+            const fetch = (await import("node-fetch")).default;
+
             const response = await fetch(this.datacerEndpoint);
             if (!response.ok) {
                 throw new Error(`Response status: ${response.status}`);
@@ -135,8 +135,8 @@ class DatacerFetcher {
         } catch (error) {
             console.warn(
                 chalk.yellow(
-                    `Failed to fetch Datacer data: ${error.message} (${this.datacerEndpoint})`
-                )
+                    `Failed to fetch Datacer data: ${error.message} (${this.datacerEndpoint})`,
+                ),
             );
             return null;
         }
@@ -169,16 +169,16 @@ class DatacerFetcher {
         if (!datacerData || !datacerData.vacuum) {
             console.log(
                 chalk.yellow(
-                    `No Datacer vacuum data received at ${new Date().toLocaleString()}`
-                )
+                    `No Datacer vacuum data received at ${new Date().toLocaleString()}`,
+                ),
             );
             return;
         }
 
         console.log(
             chalk.gray(
-                `Received ${datacerData.vacuum.length} Datacer vacuum readings at ${new Date().toLocaleString()}`
-            )
+                `Received ${datacerData.vacuum.length} Datacer vacuum readings at ${new Date().toLocaleString()}`,
+            ),
         );
 
         // Process each vacuum sensor with 100ms delay between events
@@ -216,6 +216,14 @@ class DatacerFetcher {
             name: deviceName,
         });
 
+        // Determine event name based on device name
+        // Use "sensor/vacuum" for pumps (POMPE devices), "Vacuum/Lignes" for vacuum lines
+        const eventName = this.normalizeDeviceName(vacuumItem.device).includes(
+            "POMPE",
+        )
+            ? "sensor/vacuum"
+            : "Vacuum/Lignes";
+
         // Format event data in the same structure as Particle events
         const eventData = {
             noSerie: this.serialNo,
@@ -228,7 +236,7 @@ class DatacerFetcher {
             device: this.normalizeDeviceName(vacuumItem.device),
             label: this.normalizeLabel(vacuumItem.label),
             lastUpdatedAt: vacuumItem.lastUpdatedAt,
-            eName: "Vacuum/Lignes", // Event name to identify Datacer events
+            eName: eventName, // Event name to identify Datacer events
         };
 
         // Add runtime info for specific devices
@@ -240,7 +248,8 @@ class DatacerFetcher {
         // Create Particle-like event structure
         return {
             coreid: deviceId, // Use "DATACER" as device ID
-            published_at: new Date().toISOString(),
+            // published_at: new Date().toISOString(),
+            published_at: eventData.lastUpdatedAt,
             name: this.normalizeLabel(vacuumItem.label), // Use sensor label (e.g., "EB-V1") instead of device ID
             data: JSON.stringify(eventData),
             upstream: false, // Mark as local/synthetic event
