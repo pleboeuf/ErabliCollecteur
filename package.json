@@ -3,7 +3,9 @@
     "version": "1.1.0",
     "private": true,
     "scripts": {
-        "start": "node app.js"
+        "start": "node app.js",
+        "test": "mocha test/**/*.test.js --timeout 10000",
+        "test:datacer": "mocha test/datacer.test.js --timeout 70000"
     },
     "dependencies": {
         "@hapi/cryptiles": "^5.1.0",
@@ -14,6 +16,7 @@
         "hawk": "^9.0.1",
         "integer": "^2.1.0",
         "mime": "^2.6.0",
+        "node-fetch": "^3.3.2",
         "node-gyp": "^12.1.0",
         "particle-api-js": "^9.1.2",
         "promise": "^8.3.0",
@@ -22,5 +25,8 @@
     },
     "engines": {
         "node": ">= 22.11.0"
+    },
+    "devDependencies": {
+        "mocha": "^11.7.5"
     }
 }
