@@ -1,19 +1,70 @@
+# Database files
 *.sqlite3
+*.sq3
+*.db
+
+# Data files
 *.csv
+data/
+
+# Dependencies
 node_modules/
+package-lock.json.bak
+
+# IDEs
 .idea/
-.run.sh.swp
 .vscode/
-.vscode/launch.json
-.DS_Store
+*.swp
+*.swo
+*~
+
+# Environment variables
 .env
-ErabliWatchDog/
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
 log/
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Process files
 pid/
+*.pid
+*.seed
+*.pid.lock
+
+# Runtime and build artifacts
 run.sh
+*.tar.gz
+*.zip
+
+# Configuration
 config.json
-ErabliWatchDog/CollecteurRestart.log
+
+# Project specific
+ErabliWatchDog/
+
+# Backup files
 *.bk
 *.bak
-*.sq3
-*.tar.gz
+*.backup
+*.old
+*.orig
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
