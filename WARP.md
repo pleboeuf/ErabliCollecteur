@@ -162,14 +162,33 @@ docker build -t elecnix/erablicollecteur .
 docker run -d --volume=$(pwd)/data:/data -p 8150:8150 elecnix/erablicollecteur
 ```
 
-### Systemd Service (Linux production)
+### Process Management (Production)
+
+The system is managed using **PM2** process manager for all three components (ErabliCollecteur, ErabliDash, ErabliExport).
+
 ```bash
-# Service file location: ErabliCollecteur.service
-# Runs as user 'erabliere' with PID file tracking
-sudo systemctl enable ErabliCollecteur.service
-sudo systemctl start ErabliCollecteur.service
-sudo systemctl status ErabliCollecteur.service
+# Start all components (recommended)
+./startErabli.sh
+
+# Stop all components
+./stopErabli.sh
+
+# Restart all components
+./restartErabli.sh
+
+# View status and logs
+pm2 status
+pm2 logs
+pm2 monit
 ```
+
+**Configuration:** See `ecosystem.config.js` in parent directory for PM2 configuration.
+
+**Documentation:** 
+- Full guide: `../PM2-README.md`
+- Quick reference: `../PM2-CHEATSHEET.md`
+
+**Legacy systemd services:** The original systemd service files are kept for reference but are no longer used. PM2 provides better cross-platform support and unified management.
 
 ## Important Implementation Details
 
@@ -260,9 +279,10 @@ Note: ErabliExport can run in playback mode (`node app playbackOnly`) to process
 
 ### Typical Deployment Topology
 For production deployments, all three components typically run on the same host:
-- ErabliCollecteur runs as a systemd service (ErabliCollecteur.service)
-- ErabliDash and ErabliExport run as separate services or containers
+- All three components managed by PM2 process manager
+- Configured via single `ecosystem.config.js` file
 - All three share localhost networking (ws://localhost:8150)
+- PM2 configured to start on boot via systemd (PM2 startup script)
 
 ### Docker Deployment
 When deploying with Docker, use container linking or Docker Compose networking:
