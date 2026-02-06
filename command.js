@@ -17,6 +17,7 @@ exports.CommandHandler = function (db, blacklist) {
         const hasDeviceParam = typeof command.device !== "undefined";
         const hasGenerationParam = typeof command.generation !== "undefined";
         const hasAfterParam = typeof command.after !== "undefined";
+        const hasLimitParam = typeof command.limit !== "undefined";
         if (hasAfterParam && !hasDeviceParam) {
             connection.send(
                 JSON.stringify({
@@ -45,7 +46,13 @@ exports.CommandHandler = function (db, blacklist) {
             sql = sql + " and generation_id = ?";
             params.push(command.generation);
         }
-        sql = sql + " order by generation_id, serial_no";
+        // Order by descending when limit is used to get the latest events first
+        if (hasLimitParam) {
+            sql = sql + " order by generation_id desc, serial_no desc limit ?";
+            params.push(command.limit);
+        } else {
+            sql = sql + " order by generation_id, serial_no";
+        }
 
         // TODO Abort query when connection closes.
         const iterator = db.prepare(sql).iterate(params);
@@ -108,7 +115,7 @@ exports.CommandHandler = function (db, blacklist) {
     }
 
     return {
-        // format: { "command" : "query", "device": "device-id", "generation" : 0, "after": 0 }
+        // format: { "command" : "query", "device": "device-id", "generation" : 0, "after": 0, "limit": 1 }
         onCommand: function (command, connection) {
             if (command.command === "subscribe") {
                 connection.subscribed = true;
