@@ -15,11 +15,24 @@ exports.EventDatabase = function (db) {
         self.deviceAttributes[deviceId] = dev;
     };
 
+    // Known Particle system events that don't contain noSerie but are normal
+    const knownSystemEvents = [
+        "spark/status",
+        "spark/device/diagnostics/update",
+        "particle/device/updates/enabled",
+        "particle/device/updates/forced",
+        "particle/device/updates/pending",
+    ];
+
     this.handleEvent = function (event) {
         // var publishDate = new Date(event.published_at);
         const publishDate = event.published_at;
         if (event.data.indexOf("noSerie", 0) == -1) {
-            console.warn("Unknown event: " + JSON.stringify(event));
+            if (knownSystemEvents.includes(event.name)) {
+                console.log(chalk.gray("System event: %s from %s"), event.name, self.devString(event.coreid));
+            } else {
+                console.warn("Unknown event: " + JSON.stringify(event));
+            }
             return;
         }
         try {
