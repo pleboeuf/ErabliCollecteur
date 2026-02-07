@@ -5,3 +5,6 @@
    generation_id integer,
    serial_no integer
 );
+
+-- Index for duplicate detection (device_id, generation_id, serial_no)
+CREATE INDEX IF NOT EXISTS idx_raw_events_dedup ON raw_events (device_id, generation_id, serial_no);

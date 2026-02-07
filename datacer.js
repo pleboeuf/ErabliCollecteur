@@ -193,7 +193,7 @@ class DatacerFetcher {
 
             // Add 100ms delay between events to avoid saturating downstream modules
             if (i < datacerData.vacuum.length - 1) {
-                await this.delay(100);
+                await this.delay(200);
             }
         }
     }

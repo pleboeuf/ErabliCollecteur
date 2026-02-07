@@ -5,6 +5,14 @@ exports.EventDatabase = function (db) {
     var self = this;
     self.listeners = [];
     self.deviceAttributes = {};
+
+    // Pre-compile prepared statements for better performance
+    const insertStmt = db.prepare(
+        "INSERT INTO raw_events (device_id, published_at, generation_id, serial_no, raw_data) VALUES (?, ?, ?, ?, ?)"
+    );
+    const containsStmt = db.prepare(
+        "SELECT 1 FROM raw_events WHERE device_id = ? AND generation_id = ? AND serial_no = ? LIMIT 1"
+    );
     self.devString = function (deviceId) {
         var name = self.deviceAttributes[deviceId]
             ? self.deviceAttributes[deviceId].name
@@ -129,9 +137,6 @@ exports.EventDatabase = function (db) {
         publishDate,
         rawData
     ) {
-        var sql =
-            "INSERT INTO raw_events (device_id, published_at, generation_id, serial_no, raw_data) VALUES (?, ?, ?, ?, ?)";
-        var prepared = db.prepare(sql);
         return new Promise(function (complete, reject) {
             var params = [
                 deviceId,
@@ -148,7 +153,7 @@ exports.EventDatabase = function (db) {
                 rawData
             );
             try {
-                prepared.run(params);
+                insertStmt.run(params);
                 complete();
             } catch (err) {
                 reject(err);
@@ -158,13 +163,10 @@ exports.EventDatabase = function (db) {
     };
 
     this.containsEvent = function (deviceId, generationId, serialNo) {
-        const sql =
-            "select 1 from raw_events where device_id = ? and generation_id = ? and serial_no = ?";
-        var prepared = db.prepare(sql);
         return new Promise(function (complete, reject) {
             try {
                 const params = [deviceId, generationId, serialNo];
-                const row = prepared.get(params);
+                const row = containsStmt.get(params);
                 complete(typeof row !== "undefined");
             } catch (err) {
                 reject(err);
