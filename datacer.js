@@ -1,17 +1,41 @@
 const chalk = require("chalk");
 
+// Endpoint types supported by DatacerFetcher
+const ENDPOINT_TYPES = {
+    VACUUM: 'vacuum',
+    TANK: 'tank',
+    WATER: 'water'
+};
+
 /**
- * DatacerFetcher - Fetches vacuum data from Datacer API and formats it as events
+ * DatacerFetcher - Fetches data from Datacer API and formats it as events
+ * Supports vacuum, tank, and water endpoints
  */
 class DatacerFetcher {
-    constructor(eventDB, datacerEndpoint, db) {
+    constructor(eventDB, datacerEndpoint, db, endpointType = ENDPOINT_TYPES.VACUUM) {
         this.eventDB = eventDB;
         this.datacerEndpoint = datacerEndpoint;
         this.db = db;
+        this.endpointType = endpointType;
         this.intervalId = null;
         this.generationId = 0; // Datacer generation counter
         this.serialNo = 0; // Sequential event number
         this.initialized = false;
+        this.deviceIdPrefix = this.getDeviceIdPrefix();
+    }
+
+    /**
+     * Get the device ID prefix based on endpoint type
+     */
+    getDeviceIdPrefix() {
+        switch (this.endpointType) {
+            case ENDPOINT_TYPES.TANK:
+                return 'DATACER-TANK';
+            case ENDPOINT_TYPES.WATER:
+                return 'DATACER-WATER';
+            default:
+                return 'DATACER';
+        }
     }
 
     /**
@@ -22,11 +46,11 @@ class DatacerFetcher {
             const sql = `
                 SELECT generation_id, serial_no 
                 FROM raw_events 
-                WHERE device_id = 'DATACER' 
+                WHERE device_id LIKE ? 
                 ORDER BY generation_id DESC, serial_no DESC 
                 LIMIT 1
             `;
-            const row = this.db.prepare(sql).get();
+            const row = this.db.prepare(sql).get(`${this.deviceIdPrefix}%`);
 
             if (row) {
                 // Check if this is from a previous run (generation ID is a past timestamp)
@@ -41,7 +65,7 @@ class DatacerFetcher {
                     this.serialNo = 0;
                     console.log(
                         chalk.gray(
-                            `Datacer starting new generation ${this.generationId} (previous: ${lastGeneration})`,
+                            `Datacer [${this.endpointType}] starting new generation ${this.generationId} (previous: ${lastGeneration})`,
                         ),
                     );
                 } else {
@@ -50,7 +74,7 @@ class DatacerFetcher {
                     this.serialNo = row.serial_no;
                     console.log(
                         chalk.gray(
-                            `Datacer resuming generation ${this.generationId} from serial ${this.serialNo}`,
+                            `Datacer [${this.endpointType}] resuming generation ${this.generationId} from serial ${this.serialNo}`,
                         ),
                     );
                 }
@@ -60,7 +84,7 @@ class DatacerFetcher {
                 this.serialNo = 0;
                 console.log(
                     chalk.gray(
-                        `No previous Datacer events found. Starting generation ${this.generationId}`,
+                        `No previous Datacer [${this.endpointType}] events found. Starting generation ${this.generationId}`,
                     ),
                 );
             }
@@ -68,7 +92,7 @@ class DatacerFetcher {
         } catch (error) {
             console.error(
                 chalk.red(
-                    `Failed to initialize Datacer state: ${error.message}`,
+                    `Failed to initialize Datacer [${this.endpointType}] state: ${error.message}`,
                 ),
             );
             // Fallback to timestamp-based generation
@@ -84,7 +108,7 @@ class DatacerFetcher {
     async start() {
         console.log(
             chalk.gray(
-                `Starting Datacer polling from ${this.datacerEndpoint} every 60 seconds`,
+                `Starting Datacer [${this.endpointType}] polling from ${this.datacerEndpoint} every 60 seconds`,
             ),
         );
 
@@ -107,7 +131,7 @@ class DatacerFetcher {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
-            console.log(chalk.gray("Datacer polling stopped"));
+            console.log(chalk.gray(`Datacer [${this.endpointType}] polling stopped`));
         }
     }
 
@@ -166,10 +190,38 @@ class DatacerFetcher {
     async fetchAndEmit() {
         const datacerData = await this.fetchDatacerData();
 
-        if (!datacerData || !datacerData.vacuum) {
+        if (!datacerData) {
             console.log(
                 chalk.yellow(
-                    `No Datacer vacuum data received at ${new Date().toLocaleString()}`,
+                    `No Datacer [${this.endpointType}] data received at ${new Date().toLocaleString()}`,
+                ),
+            );
+            return;
+        }
+
+        // Get the data array based on endpoint type
+        let dataArray;
+        let createEventFn;
+
+        switch (this.endpointType) {
+            case ENDPOINT_TYPES.TANK:
+                dataArray = datacerData.tank;
+                createEventFn = this.createSyntheticTankEvent.bind(this);
+                break;
+            case ENDPOINT_TYPES.WATER:
+                dataArray = datacerData.water;
+                createEventFn = this.createSyntheticWaterEvent.bind(this);
+                break;
+            default: // VACUUM
+                dataArray = datacerData.vacuum;
+                createEventFn = this.createSyntheticVacuumEvent.bind(this);
+                break;
+        }
+
+        if (!dataArray || dataArray.length === 0) {
+            console.log(
+                chalk.yellow(
+                    `No Datacer [${this.endpointType}] data in response at ${new Date().toLocaleString()}`,
                 ),
             );
             return;
@@ -177,22 +229,22 @@ class DatacerFetcher {
 
         console.log(
             chalk.gray(
-                `Received ${datacerData.vacuum.length} Datacer vacuum readings at ${new Date().toLocaleString()}`,
+                `Received ${dataArray.length} Datacer [${this.endpointType}] readings at ${new Date().toLocaleString()}`,
             ),
         );
 
-        // Process each vacuum sensor with 100ms delay between events
-        for (let i = 0; i < datacerData.vacuum.length; i++) {
-            const item = datacerData.vacuum[i];
+        // Process each item with delay between events
+        for (let i = 0; i < dataArray.length; i++) {
+            const item = dataArray[i];
 
             // Create synthetic event in Particle event format
-            const syntheticEvent = this.createSyntheticEvent(item);
+            const syntheticEvent = createEventFn(item);
 
             // Emit the event through EventDatabase
             this.eventDB.handleEvent(syntheticEvent);
 
-            // Add 100ms delay between events to avoid saturating downstream modules
-            if (i < datacerData.vacuum.length - 1) {
+            // Add 200ms delay between events to avoid saturating downstream modules
+            if (i < dataArray.length - 1) {
                 await this.delay(200);
             }
         }
@@ -201,7 +253,7 @@ class DatacerFetcher {
     /**
      * Create a synthetic Particle-like event from Datacer vacuum data
      */
-    createSyntheticEvent(vacuumItem) {
+    createSyntheticVacuumEvent(vacuumItem) {
         this.serialNo++;
 
         // Use the device name from Datacer as the device ID for better logging
@@ -239,22 +291,97 @@ class DatacerFetcher {
             eName: eventName, // Event name to identify Datacer events
         };
 
-        // Add runtime info for specific devices
-        // if (["EB-V1", "EB-V2", "EB-V3"].includes(vacuumItem.device)) {
-        //     eventData.RunTimeSinceMaint = vacuumItem.RunTimeSinceMaint;
-        //     eventData.NeedMaintenance = vacuumItem.NeedMaintenance;
-        // }
-
         // Create Particle-like event structure
         return {
-            coreid: deviceId, // Use "DATACER" as device ID
-            // published_at: new Date().toISOString(),
+            coreid: deviceId,
             published_at: eventData.lastUpdatedAt,
             name: this.normalizeLabel(vacuumItem.label), // Use sensor label (e.g., "EB-V1") instead of device ID
             data: JSON.stringify(eventData),
             upstream: false, // Mark as local/synthetic event
         };
     }
+
+    /**
+     * Create a synthetic Particle-like event from Datacer tank data
+     */
+    createSyntheticTankEvent(tankItem) {
+        this.serialNo++;
+
+        // Use device name from Datacer as the device ID
+        const deviceId = tankItem.device || `${this.deviceIdPrefix}-${tankItem.code}`;
+        const tankName = tankItem.name; // Tank name (e.g., "RC1", "RF1")
+
+        // Update device attributes
+        this.eventDB.setAttributes(deviceId, {
+            id: deviceId,
+            name: tankName,
+        });
+
+        // Format event data
+        const eventData = {
+            noSerie: this.serialNo,
+            generation: this.generationId,
+            code: tankItem.code,
+            name: tankName,
+            device: deviceId,
+            rawValue: parseFloat(tankItem.rawValue) || 0,
+            depth: parseFloat(tankItem.Depth) || 0,
+            capacity: parseFloat(tankItem.Capacity) || 0,
+            fill: parseFloat(tankItem.fill) || 0,
+            lastUpdatedAt: tankItem.lastUpdatedAt,
+            eName: "Tank/Level",
+        };
+
+        // Create Particle-like event structure
+        return {
+            coreid: deviceId,
+            published_at: tankItem.lastUpdatedAt,
+            name: tankName, // Use tank name as event name
+            data: JSON.stringify(eventData),
+            upstream: false,
+        };
+    }
+
+    /**
+     * Create a synthetic Particle-like event from Datacer water data
+     */
+    createSyntheticWaterEvent(waterItem) {
+        this.serialNo++;
+
+        // Use device name or ID from Datacer
+        const deviceId = `${this.deviceIdPrefix}-${waterItem.id}`;
+        const meterName = waterItem.Name; // Water meter name (e.g., "COMPTEUR-EAU")
+
+        // Update device attributes
+        this.eventDB.setAttributes(deviceId, {
+            id: deviceId,
+            name: meterName,
+        });
+
+        // Format event data
+        const eventData = {
+            noSerie: this.serialNo,
+            generation: this.generationId,
+            id: waterItem.id,
+            name: meterName,
+            device: deviceId,
+            volume_total: parseFloat(waterItem.volume_total) || 0,
+            volume_heure: parseFloat(waterItem.volume_heure) || 0,
+            volume_entaille: parseFloat(waterItem.volume_entaille) || 0,
+            volume_since_reset: parseFloat(waterItem.volume_since_reset) || 0,
+            lastUpdatedAt: waterItem.timestamp,
+            eName: "Water/Volume",
+        };
+
+        // Create Particle-like event structure
+        return {
+            coreid: deviceId,
+            published_at: waterItem.timestamp,
+            name: meterName, // Use meter name as event name
+            data: JSON.stringify(eventData),
+            upstream: false,
+        };
+    }
 }
 
-module.exports = { DatacerFetcher };
+module.exports = { DatacerFetcher, ENDPOINT_TYPES };

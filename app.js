@@ -11,7 +11,7 @@ const chalk = require("chalk");
 const Command = require("./command.js");
 const WebSocket = require("ws");
 const eventmodule = require("./event.js");
-const { DatacerFetcher } = require("./datacer.js");
+const { DatacerFetcher, ENDPOINT_TYPES } = require("./datacer.js");
 const config = require("./config.json");
 const dbFile = config.database || "raw_events.sqlite3";
 const particle = new Particle();
@@ -27,7 +27,7 @@ const INACTIVITY_TIMEOUT_MS = 150 * 1000; // 150 seconds
 let mainDbConnection = null; // Keep a reference to the main DB connection
 let webSocketServer = null; // Keep a reference to the WebSocket server
 let particleStream = null; // Keep a reference to the Particle stream
-let datacerFetcher = null; // Keep a reference to the Datacer fetcher
+let datacerFetchers = []; // Keep references to all Datacer fetchers
 // --- End Added ---
 
 function devString(deviceId) {
@@ -45,11 +45,11 @@ function shutdown(reason) {
         inactivityTimer = null;
     }
 
-    // Stop Datacer Fetcher if it exists
-    if (datacerFetcher) {
-        console.log(chalk.gray("Stopping Datacer fetcher..."));
-        datacerFetcher.stop();
-        datacerFetcher = null;
+    // Stop all Datacer Fetchers
+    if (datacerFetchers.length > 0) {
+        console.log(chalk.gray(`Stopping ${datacerFetchers.length} Datacer fetcher(s)...`));
+        datacerFetchers.forEach(fetcher => fetcher.stop());
+        datacerFetchers = [];
     }
 
     // Close Particle Stream if it exists
@@ -116,14 +116,39 @@ function startApp(db) {
     eventDB = new eventmodule.EventDatabase(db);
     const app = createExpressApp(db); // Pass db here if needed, though the route handler reopens it
 
-    // Start Datacer fetcher if endpoint is configured
+    // Start Datacer fetchers for all configured endpoints
     if (process.env.ENDPOINT_VAC) {
-        datacerFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_VAC, db);
-        datacerFetcher.start();
+        const vacFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_VAC, db, ENDPOINT_TYPES.VACUUM);
+        vacFetcher.start();
+        datacerFetchers.push(vacFetcher);
     } else {
         console.log(
             chalk.yellow(
-                "ENDPOINT_VAC not configured. Datacer polling disabled."
+                "ENDPOINT_VAC not configured. Datacer vacuum polling disabled."
+            )
+        );
+    }
+
+    if (process.env.ENDPOINT_TANK) {
+        const tankFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_TANK, db, ENDPOINT_TYPES.TANK);
+        tankFetcher.start();
+        datacerFetchers.push(tankFetcher);
+    } else {
+        console.log(
+            chalk.yellow(
+                "ENDPOINT_TANK not configured. Datacer tank polling disabled."
+            )
+        );
+    }
+
+    if (process.env.ENDPOINT_WATER) {
+        const waterFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_WATER, db, ENDPOINT_TYPES.WATER);
+        waterFetcher.start();
+        datacerFetchers.push(waterFetcher);
+    } else {
+        console.log(
+            chalk.yellow(
+                "ENDPOINT_WATER not configured. Datacer water polling disabled."
             )
         );
     }
