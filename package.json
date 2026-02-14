@@ -9,7 +9,7 @@
     },
     "dependencies": {
         "@hapi/cryptiles": "^5.1.0",
-        "better-sqlite3": "^11.6.0",
+        "better-sqlite3": "^11.10.0",
         "chalk": "^4.1.2",
         "dotenv": "^16.3.1",
         "express": "^4.22.1",

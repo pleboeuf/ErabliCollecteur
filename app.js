@@ -23,7 +23,7 @@ const nodeArg = process.argv;
 
 // --- Added ---
 let inactivityTimer = null;
-const INACTIVITY_TIMEOUT_MS = 150 * 1000; // 150 seconds
+const INACTIVITY_TIMEOUT_MS = 299 * 1000; // 299 seconds
 let mainDbConnection = null; // Keep a reference to the main DB connection
 let webSocketServer = null; // Keep a reference to the WebSocket server
 let particleStream = null; // Keep a reference to the Particle stream
