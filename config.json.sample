@@ -13,5 +13,9 @@
             "timestampUntil": 1521484806868,
             "reason": "Missing generation & serial"
         }
-    ]
+    ],
+    "datacer": {
+        "pollIntervalMs": 300000,
+        "emitDelayMs": 1000
+    }
 }

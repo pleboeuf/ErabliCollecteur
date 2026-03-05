@@ -117,8 +117,9 @@ function startApp(db) {
     const app = createExpressApp(db); // Pass db here if needed, though the route handler reopens it
 
     // Start Datacer fetchers for all configured endpoints
+    const datacerOpts = config.datacer || {};
     if (process.env.ENDPOINT_VAC) {
-        const vacFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_VAC, db, ENDPOINT_TYPES.VACUUM);
+        const vacFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_VAC, db, ENDPOINT_TYPES.VACUUM, datacerOpts);
         vacFetcher.start();
         datacerFetchers.push(vacFetcher);
     } else {
@@ -130,7 +131,7 @@ function startApp(db) {
     }
 
     if (process.env.ENDPOINT_TANK) {
-        const tankFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_TANK, db, ENDPOINT_TYPES.TANK);
+        const tankFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_TANK, db, ENDPOINT_TYPES.TANK, datacerOpts);
         tankFetcher.start();
         datacerFetchers.push(tankFetcher);
     } else {
@@ -142,7 +143,7 @@ function startApp(db) {
     }
 
     if (process.env.ENDPOINT_WATER) {
-        const waterFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_WATER, db, ENDPOINT_TYPES.WATER);
+        const waterFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_WATER, db, ENDPOINT_TYPES.WATER, datacerOpts);
         waterFetcher.start();
         datacerFetchers.push(waterFetcher);
     } else {

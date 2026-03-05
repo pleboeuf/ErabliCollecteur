@@ -17,11 +17,14 @@ class DatacerFetcher {
         datacerEndpoint,
         db,
         endpointType = ENDPOINT_TYPES.VACUUM,
+        options = {},
     ) {
         this.eventDB = eventDB;
         this.datacerEndpoint = datacerEndpoint;
         this.db = db;
         this.endpointType = endpointType;
+        this.pollIntervalMs = options.pollIntervalMs || 300000; // default 5 minutes
+        this.emitDelayMs = options.emitDelayMs || 1000; // default 1 second
         this.intervalId = null;
         this.generationId = 0; // Datacer generation counter
         this.serialNo = 0; // Sequential event number
@@ -113,7 +116,7 @@ class DatacerFetcher {
     async start() {
         console.log(
             chalk.gray(
-                `Starting Datacer [${this.endpointType}] polling from ${this.datacerEndpoint} every 60 seconds`,
+                `Starting Datacer [${this.endpointType}] polling from ${this.datacerEndpoint} every ${this.pollIntervalMs / 1000}s (emit delay: ${this.emitDelayMs}ms)`,
             ),
         );
 
@@ -123,10 +126,10 @@ class DatacerFetcher {
         // Fetch immediately on start
         this.fetchAndEmit();
 
-        // Then fetch every 1 minute
+        // Then fetch at configured interval
         this.intervalId = setInterval(() => {
             this.fetchAndEmit();
-        }, 60000 * 5); // 5 minutes interval to reduce load and avoid hitting API limits
+        }, this.pollIntervalMs);
     }
 
     /**
@@ -250,9 +253,9 @@ class DatacerFetcher {
             // Emit the event through EventDatabase
             this.eventDB.handleEvent(syntheticEvent);
 
-            // Add 200ms delay between events to avoid saturating downstream modules
+            // Add delay between events to avoid saturating downstream modules
             if (i < dataArray.length - 1) {
-                await this.delay(1000);
+                await this.delay(this.emitDelayMs);
             }
         }
     }
