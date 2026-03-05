@@ -2,9 +2,9 @@ const chalk = require("chalk");
 
 // Endpoint types supported by DatacerFetcher
 const ENDPOINT_TYPES = {
-    VACUUM: 'vacuum',
-    TANK: 'tank',
-    WATER: 'water'
+    VACUUM: "vacuum",
+    TANK: "tank",
+    WATER: "water",
 };
 
 /**
@@ -12,7 +12,12 @@ const ENDPOINT_TYPES = {
  * Supports vacuum, tank, and water endpoints
  */
 class DatacerFetcher {
-    constructor(eventDB, datacerEndpoint, db, endpointType = ENDPOINT_TYPES.VACUUM) {
+    constructor(
+        eventDB,
+        datacerEndpoint,
+        db,
+        endpointType = ENDPOINT_TYPES.VACUUM,
+    ) {
         this.eventDB = eventDB;
         this.datacerEndpoint = datacerEndpoint;
         this.db = db;
@@ -30,11 +35,11 @@ class DatacerFetcher {
     getDeviceIdPrefix() {
         switch (this.endpointType) {
             case ENDPOINT_TYPES.TANK:
-                return 'DATACER-TANK';
+                return "DATACER-TANK";
             case ENDPOINT_TYPES.WATER:
-                return 'DATACER-WATER';
+                return "DATACER-WATER";
             default:
-                return 'DATACER';
+                return "DATACER";
         }
     }
 
@@ -121,7 +126,7 @@ class DatacerFetcher {
         // Then fetch every 1 minute
         this.intervalId = setInterval(() => {
             this.fetchAndEmit();
-        }, 60000);
+        }, 60000 * 5); // 5 minutes interval to reduce load and avoid hitting API limits
     }
 
     /**
@@ -131,7 +136,9 @@ class DatacerFetcher {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
-            console.log(chalk.gray(`Datacer [${this.endpointType}] polling stopped`));
+            console.log(
+                chalk.gray(`Datacer [${this.endpointType}] polling stopped`),
+            );
         }
     }
 
@@ -245,7 +252,7 @@ class DatacerFetcher {
 
             // Add 200ms delay between events to avoid saturating downstream modules
             if (i < dataArray.length - 1) {
-                await this.delay(200);
+                await this.delay(1000);
             }
         }
     }
@@ -308,7 +315,8 @@ class DatacerFetcher {
         this.serialNo++;
 
         // Use device name from Datacer as the device ID
-        const deviceId = tankItem.device || `${this.deviceIdPrefix}-${tankItem.code}`;
+        const deviceId =
+            tankItem.device || `${this.deviceIdPrefix}-${tankItem.code}`;
         const tankName = tankItem.name; // Tank name (e.g., "RC1", "RF1")
 
         // Update device attributes
