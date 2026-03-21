@@ -23,7 +23,7 @@ const nodeArg = process.argv;
 
 // --- Added ---
 let inactivityTimer = null;
-const INACTIVITY_TIMEOUT_MS = 299 * 1000; // 299 seconds
+const INACTIVITY_TIMEOUT_MS = 300 * 1000; // 300 seconds
 let mainDbConnection = null; // Keep a reference to the main DB connection
 let webSocketServer = null; // Keep a reference to the WebSocket server
 let particleStream = null; // Keep a reference to the Particle stream
@@ -47,8 +47,12 @@ function shutdown(reason) {
 
     // Stop all Datacer Fetchers
     if (datacerFetchers.length > 0) {
-        console.log(chalk.gray(`Stopping ${datacerFetchers.length} Datacer fetcher(s)...`));
-        datacerFetchers.forEach(fetcher => fetcher.stop());
+        console.log(
+            chalk.gray(
+                `Stopping ${datacerFetchers.length} Datacer fetcher(s)...`,
+            ),
+        );
+        datacerFetchers.forEach((fetcher) => fetcher.stop());
         datacerFetchers = [];
     }
 
@@ -64,7 +68,7 @@ function shutdown(reason) {
         } catch (err) {
             console.error(
                 chalk.red("Error trying to abort particle stream:"),
-                err
+                err,
             );
         }
         particleStream = null;
@@ -77,7 +81,7 @@ function shutdown(reason) {
             if (err) {
                 console.error(
                     chalk.red("Error closing WebSocket server:"),
-                    err
+                    err,
                 );
             } else {
                 console.log(chalk.gray("WebSocket server closed."));
@@ -119,38 +123,56 @@ function startApp(db) {
     // Start Datacer fetchers for all configured endpoints
     const datacerOpts = config.datacer || {};
     if (process.env.ENDPOINT_VAC) {
-        const vacFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_VAC, db, ENDPOINT_TYPES.VACUUM, datacerOpts);
+        const vacFetcher = new DatacerFetcher(
+            eventDB,
+            process.env.ENDPOINT_VAC,
+            db,
+            ENDPOINT_TYPES.VACUUM,
+            datacerOpts,
+        );
         vacFetcher.start();
         datacerFetchers.push(vacFetcher);
     } else {
         console.log(
             chalk.yellow(
-                "ENDPOINT_VAC not configured. Datacer vacuum polling disabled."
-            )
+                "ENDPOINT_VAC not configured. Datacer vacuum polling disabled.",
+            ),
         );
     }
 
     if (process.env.ENDPOINT_TANK) {
-        const tankFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_TANK, db, ENDPOINT_TYPES.TANK, datacerOpts);
+        const tankFetcher = new DatacerFetcher(
+            eventDB,
+            process.env.ENDPOINT_TANK,
+            db,
+            ENDPOINT_TYPES.TANK,
+            datacerOpts,
+        );
         tankFetcher.start();
         datacerFetchers.push(tankFetcher);
     } else {
         console.log(
             chalk.yellow(
-                "ENDPOINT_TANK not configured. Datacer tank polling disabled."
-            )
+                "ENDPOINT_TANK not configured. Datacer tank polling disabled.",
+            ),
         );
     }
 
     if (process.env.ENDPOINT_WATER) {
-        const waterFetcher = new DatacerFetcher(eventDB, process.env.ENDPOINT_WATER, db, ENDPOINT_TYPES.WATER, datacerOpts);
+        const waterFetcher = new DatacerFetcher(
+            eventDB,
+            process.env.ENDPOINT_WATER,
+            db,
+            ENDPOINT_TYPES.WATER,
+            datacerOpts,
+        );
         waterFetcher.start();
         datacerFetchers.push(waterFetcher);
     } else {
         console.log(
             chalk.yellow(
-                "ENDPOINT_WATER not configured. Datacer water polling disabled."
-            )
+                "ENDPOINT_WATER not configured. Datacer water polling disabled.",
+            ),
         );
     }
 
@@ -195,9 +217,9 @@ function ensureDatabase() {
                     if (closeErr) {
                         console.error(
                             chalk.yellow(
-                                "Warning: Could not close file descriptor for existing DB"
+                                "Warning: Could not close file descriptor for existing DB",
                             ),
-                            closeErr
+                            closeErr,
                         );
                     }
                 });
@@ -267,8 +289,8 @@ function createExpressApp(db) {
                     } catch (parseError) {
                         console.warn(
                             chalk.yellow(
-                                `Skipping row due to JSON parse error: device=${row.device_id}, gen=${row.generation_id}, sn=${row.serial_no}`
-                            )
+                                `Skipping row due to JSON parse error: device=${row.device_id}, gen=${row.generation_id}, sn=${row.serial_no}`,
+                            ),
                         );
                         return null; // Skip this row
                     }
@@ -286,11 +308,11 @@ function createExpressApp(db) {
         } catch (err) {
             console.error(
                 chalk.red("Error handling /device/:id request:"),
-                err
+                err,
             );
             // Avoid sending detailed error messages to the client in production
             res.status(500).send(
-                JSON.stringify({ error: "Internal Server Error" })
+                JSON.stringify({ error: "Internal Server Error" }),
             );
         } finally {
             // Ensure the request-specific DB connection is closed
@@ -308,7 +330,7 @@ function connectToParticleCloud(
     eventDB,
     streamOption,
     replayOption,
-    shutdownCallback
+    shutdownCallback,
 ) {
     particle
         .login({
@@ -318,7 +340,7 @@ function connectToParticleCloud(
         .then(function (data) {
             accessToken = data.body.access_token;
             console.log(
-                chalk.gray("Login to cloud completed. Listing devices...")
+                chalk.gray("Login to cloud completed. Listing devices..."),
             );
             return particle.listDevices({ auth: accessToken }); // Return promise for chaining
         })
@@ -326,7 +348,7 @@ function connectToParticleCloud(
             const myDevices = Devices.body;
             console.log(
                 chalk.gray("Got %s devices from cloud."),
-                myDevices.length
+                myDevices.length,
             );
             myDevices.forEach(function (dev) {
                 eventDB.setAttributes(dev.id, dev);
@@ -340,8 +362,8 @@ function connectToParticleCloud(
             } else {
                 console.log(
                     chalk.yellow(
-                        "Stream option set to 'noStream'. Not connecting to Particle event stream."
-                    )
+                        "Stream option set to 'noStream'. Not connecting to Particle event stream.",
+                    ),
                 );
                 // If not streaming, maybe shutdown immediately or based on other conditions?
                 // For now, it just won't connect to the stream.
@@ -352,19 +374,19 @@ function connectToParticleCloud(
             // Consolidated catch block
             console.error(
                 chalk.red("Failed during Particle connection/setup:"),
-                err
+                err,
             );
             // Decide if we should retry or shutdown
             if (shutdownCallback) {
                 shutdownCallback(
-                    `Particle connection failed: ${err.message || err}`
+                    `Particle connection failed: ${err.message || err}`,
                 );
             } else {
                 // Fallback if shutdown wasn't passed (shouldn't happen with current flow)
                 console.error(
                     chalk.red(
-                        "No shutdown callback available. Exiting forcefully."
-                    )
+                        "No shutdown callback available. Exiting forcefully.",
+                    ),
                 );
                 process.exit(1);
             }
@@ -382,8 +404,8 @@ function openStream(eventDB, shutdownCallback) {
         }
         console.log(
             chalk.grey(
-                `Resetting inactivity timer (${INACTIVITY_TIMEOUT_MS / 1000}s)`
-            )
+                `Resetting inactivity timer (${INACTIVITY_TIMEOUT_MS / 1000}s)`,
+            ),
         );
         inactivityTimer = setTimeout(() => {
             shutdownCallback("Inactivity timeout reached. No events received.");
@@ -404,7 +426,7 @@ function openStream(eventDB, shutdownCallback) {
                     resetTimer(); // Reset timer on every event
                     if (event.code == "ETIMEDOUT") {
                         console.error(
-                            chalk.red(new Date() + " Timeout error on stream")
+                            chalk.red(new Date() + " Timeout error on stream"),
                         );
                         // ETIMEDOUT might mean the connection needs resetting, but Particle SDK might handle this.
                         // If persistent, might need explicit reconnect logic.
@@ -415,8 +437,8 @@ function openStream(eventDB, shutdownCallback) {
                         } else {
                             console.error(
                                 chalk.red(
-                                    "eventDB not initialized when handling event!"
-                                )
+                                    "eventDB not initialized when handling event!",
+                                ),
                             );
                         }
                     }
@@ -424,7 +446,7 @@ function openStream(eventDB, shutdownCallback) {
 
                 particleStream.on("close", () => {
                     console.warn(
-                        chalk.yellow("Event stream closed unexpectedly.")
+                        chalk.yellow("Event stream closed unexpectedly."),
                     );
                     particleStream = null; // Clear reference
                     if (inactivityTimer) clearTimeout(inactivityTimer); // Stop timer
@@ -461,8 +483,8 @@ function requestAllDeviceReplay(db) {
     if (!db) {
         console.error(
             chalk.red(
-                "Database connection not available for requestAllDeviceReplay."
-            )
+                "Database connection not available for requestAllDeviceReplay.",
+            ),
         );
         return;
     }
@@ -482,8 +504,8 @@ function requestAllDeviceReplay(db) {
         ) {
             console.log(
                 chalk.gray(
-                    "No existing device data found to request replay from."
-                )
+                    "No existing device data found to request replay from.",
+                ),
             );
             return;
         }
@@ -493,8 +515,8 @@ function requestAllDeviceReplay(db) {
                 // This case should be less likely with the improved query/check above
                 console.log(
                     chalk.gray(
-                        "Skipping row with null device_id during replay request."
-                    )
+                        "Skipping row with null device_id during replay request.",
+                    ),
                 );
             } else if (
                 typeof row.generation_id === "undefined" ||
@@ -502,15 +524,15 @@ function requestAllDeviceReplay(db) {
             ) {
                 console.error(
                     chalk.red(
-                        "Got undefined/null generation for device %s. Cannot request replay. Waiting for new events. POSSIBLE DATA LOSS!"
+                        "Got undefined/null generation for device %s. Cannot request replay. Waiting for new events. POSSIBLE DATA LOSS!",
                     ),
-                    devString(row.device_id) // Use devString here
+                    devString(row.device_id), // Use devString here
                 );
             } else {
                 requestDeviceReplay(
                     row.device_id,
                     row.generation_id,
-                    row.serial_no // serial_no can be null if no events for max generation yet, handle in requestDeviceReplay if needed
+                    row.serial_no, // serial_no can be null if no events for max generation yet, handle in requestDeviceReplay if needed
                 );
             }
         });
@@ -546,7 +568,7 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
         chalk.gray("Requesting replay on %s starting after %s,%s"),
         devString(deviceId),
         generationId,
-        replaySerialNo
+        replaySerialNo,
     );
 
     // particle.getDevice is deprecated, use particle.getDeviceInfo
@@ -556,9 +578,9 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
                 console.warn(
                     chalk.yellow(
                         `Device ${devString(
-                            deviceId
-                        )} is not connected. Cannot request replay.`
-                    )
+                            deviceId,
+                        )} is not connected. Cannot request replay.`,
+                    ),
                 );
                 return;
             }
@@ -587,29 +609,29 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
                             if (returnValue === 0) {
                                 console.log(
                                     chalk.green(
-                                        "Replay request on %s successfully acknowledged."
+                                        "Replay request on %s successfully acknowledged.",
                                     ),
-                                    devString(deviceId)
+                                    devString(deviceId),
                                 );
                             } else {
                                 console.warn(
                                     // Use warn instead of log for non-zero returns
                                     chalk.yellow(
-                                        "Replay request refused by %s for %s,%s with code %s. Waiting for events."
+                                        "Replay request refused by %s for %s,%s with code %s. Waiting for events.",
                                     ),
                                     devString(deviceId),
                                     generationId,
                                     replaySerialNo,
-                                    returnValue
+                                    returnValue,
                                 );
                             }
                         } else {
                             console.error(
                                 chalk.red(
-                                    "Replay request response from %s was malformed or missing return_value. Data: %s"
+                                    "Replay request response from %s was malformed or missing return_value. Data: %s",
                                 ),
                                 devString(deviceId),
-                                JSON.stringify(data)
+                                JSON.stringify(data),
                             );
                         }
                     },
@@ -617,7 +639,7 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
                         // Error handler for callFunction
                         console.error(
                             chalk.red(
-                                "Replay request failed for %s at %s,%s: %s. EVENTS MAY BE LOST! Ensure the device is online and firmware function exists, then potentially restart collector."
+                                "Replay request failed for %s at %s,%s: %s. EVENTS MAY BE LOST! Ensure the device is online and firmware function exists, then potentially restart collector.",
                             ),
                             devString(deviceId),
                             generationId,
@@ -626,10 +648,10 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
                                 ? err.body.error ||
                                       err.body.message ||
                                       JSON.stringify(err.body)
-                                : err.message || err
+                                : err.message || err,
                         );
                         // Consider if shutdown is needed on critical failure
-                    }
+                    },
                 );
         },
         (err) => {
@@ -637,13 +659,13 @@ function requestDeviceReplay(deviceId, generationId, serialNo) {
             console.error(
                 chalk.red(
                     `Failed to get device info for ${devString(
-                        deviceId
+                        deviceId,
                     )} before replay request: ${
                         err.body?.error || err.message || err
-                    }. Cannot request replay.`
-                )
+                    }. Cannot request replay.`,
+                ),
             );
-        }
+        },
     );
 }
 
@@ -659,22 +681,22 @@ function createWebSocketServer(server, eventDB, shutdownCallback) {
             chalk.gray(
                 `${new Date().toISOString()} Connection accepted from ${remoteAddress}. Connections: ${
                     connectedClients.size
-                }`
-            )
+                }`,
+            ),
         );
 
         // Add error handling for individual sockets
         ws.on("error", (error) => {
             console.error(
                 chalk.red(`WebSocket error from ${remoteAddress}:`),
-                error
+                error,
             );
             // Connection might close automatically after error, but ensure cleanup
             connectedClients.delete(ws);
             console.log(
                 chalk.gray(
-                    `Client removed due to error. Connections: ${connectedClients.size}`
-                )
+                    `Client removed due to error. Connections: ${connectedClients.size}`,
+                ),
             );
             try {
                 ws.close();
@@ -691,7 +713,7 @@ function createWebSocketServer(server, eventDB, shutdownCallback) {
                 const messageString = message.toString();
                 console.log(
                     chalk.gray(`Received Message from ${remoteAddress}: %s`),
-                    messageString
+                    messageString,
                 );
                 var command = JSON.parse(messageString);
 
@@ -700,7 +722,7 @@ function createWebSocketServer(server, eventDB, shutdownCallback) {
                 cmdDb = new sqlite3(dbFile, { readonly: true });
                 const commandHandler = Command.CommandHandler(
                     cmdDb,
-                    config.blacklist || [] // Ensure blacklist is an array
+                    config.blacklist || [], // Ensure blacklist is an array
                 );
                 commandHandler.onCommand(command, ws);
                 // *** cmdDb is intentionally NOT closed here. command.js will close it. ***
@@ -708,9 +730,9 @@ function createWebSocketServer(server, eventDB, shutdownCallback) {
             } catch (exception) {
                 console.error(
                     chalk.red(
-                        `Error processing message from ${remoteAddress}:`
+                        `Error processing message from ${remoteAddress}:`,
                     ),
-                    exception
+                    exception,
                 );
                 // Send error back to client if possible
                 try {
@@ -721,14 +743,14 @@ function createWebSocketServer(server, eventDB, shutdownCallback) {
                                 message: "Failed to process command",
                                 error: exception.message,
                             },
-                        })
+                        }),
                     );
                 } catch (sendError) {
                     console.error(
                         chalk.yellow(
-                            `Failed to send error message back to ${remoteAddress}:`
+                            `Failed to send error message back to ${remoteAddress}:`,
                         ),
-                        sendError
+                        sendError,
                     );
                 }
 
@@ -738,16 +760,16 @@ function createWebSocketServer(server, eventDB, shutdownCallback) {
                     try {
                         console.warn(
                             chalk.yellow(
-                                "Closing command DB connection due to error during message processing."
-                            )
+                                "Closing command DB connection due to error during message processing.",
+                            ),
                         );
                         cmdDb.close();
                     } catch (closeErr) {
                         console.error(
                             chalk.red(
-                                "Error closing command DB connection after an error:"
+                                "Error closing command DB connection after an error:",
                             ),
-                            closeErr
+                            closeErr,
                         );
                     }
                 }
@@ -760,8 +782,8 @@ function createWebSocketServer(server, eventDB, shutdownCallback) {
                 chalk.gray(
                     `${new Date().toISOString()} Peer ${remoteAddress} disconnected (Code: ${reasonCode}). Connections: ${
                         connectedClients.size
-                    }`
-                )
+                    }`,
+                ),
             );
         });
     });
@@ -784,16 +806,16 @@ function createWebSocketServer(server, eventDB, shutdownCallback) {
                     if (err) {
                         console.error(
                             chalk.red(
-                                `Failed to send event to client ${client._socket?.remoteAddress}:`
+                                `Failed to send event to client ${client._socket?.remoteAddress}:`,
                             ),
-                            err
+                            err,
                         );
                         // Assume client is disconnected, remove it
                         connectedClients.delete(client);
                         console.log(
                             chalk.gray(
-                                `Client removed due to send error. Connections: ${connectedClients.size}`
-                            )
+                                `Client removed due to send error. Connections: ${connectedClients.size}`,
+                            ),
                         );
                         try {
                             client.close();
@@ -806,8 +828,8 @@ function createWebSocketServer(server, eventDB, shutdownCallback) {
                 // Clean up clients that are no longer open if missed by 'close' event
                 console.log(
                     chalk.gray(
-                        `Removing non-open client ${client._socket?.remoteAddress}. Connections: ${connectedClients.size}`
-                    )
+                        `Removing non-open client ${client._socket?.remoteAddress}. Connections: ${connectedClients.size}`,
+                    ),
                 );
                 connectedClients.delete(client);
             }

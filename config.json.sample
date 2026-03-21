@@ -15,7 +15,7 @@
         }
     ],
     "datacer": {
-        "pollIntervalMs": 300000,
-        "emitDelayMs": 1000
+        "pollIntervalMs": 150000,
+        "emitDelayMs": 500
     }
 }

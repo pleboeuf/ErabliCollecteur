@@ -23,8 +23,8 @@ class DatacerFetcher {
         this.datacerEndpoint = datacerEndpoint;
         this.db = db;
         this.endpointType = endpointType;
-        this.pollIntervalMs = options.pollIntervalMs || 300000; // default 5 minutes
-        this.emitDelayMs = options.emitDelayMs || 1000; // default 1 second
+        this.pollIntervalMs = options.pollIntervalMs || 150000; // default 2.5 minutes
+        this.emitDelayMs = options.emitDelayMs || 500; // default 0.5 second
         this.intervalId = null;
         this.generationId = 0; // Datacer generation counter
         this.serialNo = 0; // Sequential event number
