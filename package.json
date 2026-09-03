@@ -12,7 +12,7 @@
         "better-sqlite3": "^11.10.0",
         "chalk": "^4.1.2",
         "dotenv": "^16.3.1",
-        "express": "^4.22.2",
+        "express": "^5.2.1",
         "hawk": "^9.0.1",
         "integer": "^2.1.0",
         "mime": "^2.6.0",
